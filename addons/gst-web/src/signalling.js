@@ -181,7 +181,8 @@ class WebRTCDemoSignalling {
     _onServerOpen() {
         this.state = 'connected';
         this._ws_conn.send('HELLO ' + this._peer_id);
-        this._setStatus("Registering with server, peer ID: " + this._peer_id);
+        // this._setStatus("Connecting to server" + this._peer_id);
+        this._setStatus("Connecting to server");
         this.retry_count = 0;
     }
 
@@ -222,8 +223,8 @@ class WebRTCDemoSignalling {
         this._setDebug("server message: " + event.data);
 
         if (event.data === "HELLO") {
-            this._setStatus("Registered with server.");
-            this._setStatus("Waiting for video stream.");
+            this._setStatus("Connecting to server.");
+            this._setStatus("Starting your workspace.");
             return;
         }
 

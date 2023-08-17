@@ -20,675 +20,769 @@
  *   limitations under the License.
  */
 
-// Service Worker to support PWA
-window.onload = () => {
-    'use strict';
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?ts=CACHE_VERSION');
+// keycloak
+
+const initOptions = {
+  url: "https://ssosit.coredge.io",
+  realm: "cloud",
+  clientId: "dflare",
+  onLoad: "login-required",
+};
+
+const _keycloak = Keycloak(initOptions);
+
+// createInstance()
+
+_keycloak
+  .init({ onLoad: "login-required", checkLoginIframe: false })
+  .then((res) => {
+    runApp();
+  });
+
+console.log(_keycloak.token,_keycloak.tokenParsed?.exp,_keycloak.tokenParsed?.token_type,_keycloak.idToken);
+
+function runApp() {
+  // Service Worker to support PWA
+  window.onload = () => {
+    "use strict";
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js?ts=CACHE_VERSION");
     }
-}
+  };
 
-/**
- * Fetch the value of a cookie by name.
- * @param {string} a
- */
-function getCookieValue(a) {
+  /**
+   * Fetch the value of a cookie by name.
+   * @param {string} a
+   */
+  function getCookieValue(a) {
     // https://stackoverflow.com/questions/5639346/what-is-the-shortest-function-for-reading-a-cookie-by-name-in-javascript
-    var b = document.cookie.match('(^|[^;]+)\\s*' + a + '\\s*=\\s*([^;]+)');
-    return b ? b.pop() : '';
-}
+    var b = document.cookie.match("(^|[^;]+)\\s*" + a + "\\s*=\\s*([^;]+)");
+    return b ? b.pop() : "";
+  }
 
-var ScaleLoader = VueSpinner.ScaleLoader;
+  var ScaleLoader = VueSpinner.ScaleLoader;
 
-var app = new Vue({
-
-    el: '#app',
+  var app = new Vue({
+    el: "#app",
 
     components: {
-        ScaleLoader
+      ScaleLoader,
     },
 
     data() {
-        return {
-            appName: window.location.pathname.endsWith("/") && (window.location.pathname.split("/")[1]) || "webrtc",
-            videoBitRate: 2000,
-            videoBitRateOptions: [
-                { text: '250 kb/s', value: 250 },
-                { text: '500 kb/s', value: 500 },
-                { text: '1 mbps', value: 1000 },
-                { text: '2 mbps', value: 2000 },
-                { text: '3 mbps', value: 3000 },
-                { text: '4 mbps', value: 4000 },
-                { text: '8 mbps', value: 8000 },
-                { text: '12 mbps', value: 12000 },
-                { text: '16 mbps', value: 16000 },
-                { text: '20 mbps', value: 20000 },
-                { text: '40 mbps', value: 40000 },
-                { text: '60 mbps', value: 60000 },
-                { text: '100 mbps', value: 100000 },
-                { text: '150 mbps', value: 150000 },
-                { text: '200 mbps', value: 200000 },
-            ],
-            videoFramerate: 30,
-            videoFramerateOptions: [
-                { text: '15 fps', value: 15 },
-                { text: '30 fps', value: 30 },
-                { text: '60 fps', value: 60 },
-                { text: '100 fps', value: 100 },
-            ],
-            audioEnabled: false,
-            audioBitRate: 32000,
-            audioBitRateOptions: [
-                { text: '32 kb/s', value: 32000 },
-                { text: '64 kb/s', value: 64000 },
-                { text: '128 kb/s', value: 128000 },
-                { text: '256 kb/s', value: 256000 },
-                { text: '320 kb/s', value: 320000 },
-            ],
-            showStart: false,
-            showDrawer: false,
-            logEntries: [],
-            debugEntries: [],
-            status: 'connecting',
-            loadingText: '',
-            clipboardStatus: 'disabled',
-            gamepadState: 'disconnected',
-            gamepadName: 'none',
-            windowResolution: "",
-            connectionStatType: "unknown",
-            connectionLatency: 0,
-            connectionVideoLatency: 0,
-            connectionAudioLatency: 0,
-            connectionAudioCodecName: "NA",
-            connectionAudioBitrate: 0,
-            connectionPacketsReceived: 0,
-            connectionPacketsLost: 0,
-            connectionBytesReceived: 0,
-            connectionBytesSent: 0,
-            connectionCodec: "unknown",
-            connectionVideoDecoder: "unknown",
-            connectionResolution: "",
-            connectionFrameRate: 0,
-            connectionVideoBitrate: 0,
-            connectionAvailableBandwidth: 0,
-            encoderName: "",
-            serverCPUUsage: 0,
-            gpuLoad: 0,
-            gpuMemoryTotal: 0,
-            gpuMemoryUsed: 0,
-            serverMemoryTotal: 0,
-            serverMemoryUsed: 0,
-            serverLatency: 0,
-            resizeRemote: true,
-            scaleLocal: false,
-            debug: false,
-            turnSwitch: false,
-            publishingAllowed: false,
-            publishingIdle: false,
-            publishingError: "",
-            publishingAppName: "",
-            publishingAppDisplayName: "",
-            publishingAppDescription: "",
-            publishingAppIcon: "",
-            publishingValid: false,
-            rules: {
-                required: value => {
-                    if (!value || value.length == 0)
-                        return 'required.';
-                    return true;
-                },
+      return {
+        appName:
+          (window.location.pathname.endsWith("/") &&
+            window.location.pathname.split("/")[1]) ||
+          "webrtc",
+        videoBitRate: 2000,
+        videoBitRateOptions: [
+          { text: "250 kb/s", value: 250 },
+          { text: "500 kb/s", value: 500 },
+          { text: "1 mbps", value: 1000 },
+          { text: "2 mbps", value: 2000 },
+          { text: "3 mbps", value: 3000 },
+          { text: "4 mbps", value: 4000 },
+          { text: "8 mbps", value: 8000 },
+          { text: "12 mbps", value: 12000 },
+          { text: "16 mbps", value: 16000 },
+          { text: "20 mbps", value: 20000 },
+          { text: "40 mbps", value: 40000 },
+          { text: "60 mbps", value: 60000 },
+          { text: "100 mbps", value: 100000 },
+          { text: "150 mbps", value: 150000 },
+          { text: "200 mbps", value: 200000 },
+        ],
+        videoFramerate: 30,
+        videoFramerateOptions: [
+          { text: "15 fps", value: 15 },
+          { text: "30 fps", value: 30 },
+          { text: "60 fps", value: 60 },
+          { text: "100 fps", value: 100 },
+        ],
+        audioEnabled: true,
+        audioBitRate: 32000,
+        audioBitRateOptions: [
+          { text: "32 kb/s", value: 32000 },
+          { text: "64 kb/s", value: 64000 },
+          { text: "128 kb/s", value: 128000 },
+          { text: "256 kb/s", value: 256000 },
+          { text: "320 kb/s", value: 320000 },
+        ],
+        showStart: false,
+        showDrawer: false,
+        logEntries: [],
+        debugEntries: [],
+        status: "connecting",
+        loadingText: "",
+        clipboardStatus: "enabled",
+        gamepadState: "disconnected",
+        gamepadName: "none",
+        windowResolution: "",
+        connectionStatType: "unknown",
+        connectionLatency: 0,
+        connectionVideoLatency: 0,
+        connectionAudioLatency: 0,
+        connectionAudioCodecName: "NA",
+        connectionAudioBitrate: 0,
+        connectionPacketsReceived: 0,
+        connectionPacketsLost: 0,
+        connectionBytesReceived: 0,
+        connectionBytesSent: 0,
+        connectionCodec: "unknown",
+        connectionVideoDecoder: "unknown",
+        connectionResolution: "",
+        connectionFrameRate: 0,
+        connectionVideoBitrate: 0,
+        connectionAvailableBandwidth: 0,
+        encoderName: "",
+        serverCPUUsage: 0,
+        gpuLoad: 0,
+        gpuMemoryTotal: 0,
+        gpuMemoryUsed: 0,
+        serverMemoryTotal: 0,
+        serverMemoryUsed: 0,
+        serverLatency: 0,
+        resizeRemote: true,
+        scaleLocal: true,
+        debug: false,
+        turnSwitch: false,
+        publishingAllowed: false,
+        publishingIdle: false,
+        publishingError: "",
+        publishingAppName: "",
+        publishingAppDisplayName: "",
+        publishingAppDescription: "",
+        publishingAppIcon: "",
+        publishingValid: false,
+        rules: {
+          required: (value) => {
+            if (!value || value.length == 0) return "required.";
+            return true;
+          },
 
-                validname: value => {
-                    if (value.length > 63) {
-                        return 'must be less than 63 characters.';
-                    }
-                    if (!new RegExp('^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$').exec(value)) {
-                        return 'invalid name'
-                    }
-                    if (value === this.appName) {
-                        return 'must be different than current name'
-                    }
-                    return true;
-                },
+          validname: (value) => {
+            if (value.length > 63) {
+              return "must be less than 63 characters.";
             }
-        }
+            if (
+              !new RegExp(
+                "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+              ).exec(value)
+            ) {
+              return "invalid name";
+            }
+            if (value === this.appName) {
+              return "must be different than current name";
+            }
+            return true;
+          },
+        },
+      };
     },
 
     methods: {
-        getIntParam: (key, default_value) => {
-            const prefixedKey = app.appName + "_" + key;
-            return (parseInt(window.localStorage.getItem(prefixedKey)) || default_value);
-        },
-        setIntParam: (key, value) => {
-            if (value === null) return;
-            const prefixedKey = app.appName + "_" + key;
-            window.localStorage.setItem(prefixedKey, value.toString());
-        },
-        getBoolParam: (key, default_value) => {
-            const prefixedKey = app.appName + "_" + key;
-            var v = window.localStorage.getItem(prefixedKey);
-            if (v === null) {
-                return default_value;
-            } else {
-                return (v.toString().toLowerCase() === "true");
-            }
-        },
-        setBoolParam: (key, value) => {
-            if (value === null) return;
-            const prefixedKey = app.appName + "_" + key;
-            window.localStorage.setItem(prefixedKey, value.toString());
-        },
-        getUsername: () => {
-            if (app === undefined) return "webrtc";
-            return (getCookieValue("broker_" + app.appName) || "webrtc").split("#")[0];
-        },
-        enterFullscreen() {
-            // Request full screen mode.
-            webrtc.element.parentElement.requestFullscreen();
-        },
-        playVideo() {
-            webrtc.playVideo();
-            this.showStart = false;
-        },
-        enableClipboard() {
-            navigator.clipboard.readText()
-                .then(text => {
-                    webrtc._setStatus("clipboard enabled");
-                    webrtc.sendDataChannelMessage("cr");
-                })
-                .catch(err => {
-                    webrtc._setError('Failed to read clipboard contents: ' + err);
-                });
-        },
-        publish() {
-            var data = {
-                name: this.publishingAppName,
-                displayName: this.publishingAppDisplayName,
-                description: this.publishingAppDescription,
-                icon: this.publishingAppIcon,
-            }
-            console.log("Publishing new image", data);
-
-            fetch("/publish/" + app.appName, {
-                method: "POST",
-                headers: {
-                    "content-type": "application/json"
-                },
-                body: JSON.stringify(data),
-            })
-                .then(function (response) {
-                    return response.json();
-                })
-                .then((response) => {
-                    if (response.code === 201) {
-                        this.publishingIdle = false;
-                        checkPublishing();
-                    } else {
-                        this.publishingError = response.status;
-                    }
-                });
+      getIntParam: (key, default_value) => {
+        const prefixedKey = app.appName + "_" + key;
+        return (
+          parseInt(window.localStorage.getItem(prefixedKey)) || default_value
+        );
+      },
+      setIntParam: (key, value) => {
+        if (value === null) return;
+        const prefixedKey = app.appName + "_" + key;
+        window.localStorage.setItem(prefixedKey, value.toString());
+      },
+      getBoolParam: (key, default_value) => {
+        const prefixedKey = app.appName + "_" + key;
+        var v = window.localStorage.getItem(prefixedKey);
+        if (v === null) {
+          return default_value;
+        } else {
+          return v.toString().toLowerCase() === "true";
         }
+      },
+      setBoolParam: (key, value) => {
+        if (value === null) return;
+        const prefixedKey = app.appName + "_" + key;
+        window.localStorage.setItem(prefixedKey, value.toString());
+      },
+      getUsername: () => {
+        if (app === undefined) return "webrtc";
+        return (getCookieValue("broker_" + app.appName) || "webrtc").split(
+          "#"
+        )[0];
+      },
+      enterFullscreen() {
+        // Request full screen mode.
+        webrtc.element.parentElement.requestFullscreen();
+      },
+      playVideo() {
+        webrtc.playVideo();
+        this.showStart = false;
+      },
+      enableClipboard() {
+        navigator.clipboard
+          .readText()
+          .then((text) => {
+            webrtc._setStatus("clipboard enabled");
+            webrtc.sendDataChannelMessage("cr");
+          })
+          .catch((err) => {
+            webrtc._setError("Failed to read clipboard contents: " + err);
+          });
+      },
+      publish() {
+        var data = {
+          name: this.publishingAppName,
+          displayName: this.publishingAppDisplayName,
+          description: this.publishingAppDescription,
+          icon: this.publishingAppIcon,
+        };
+        console.log("Publishing new image", data);
+
+        fetch("/publish/" + app.appName, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(data),
+        })
+          .then(function (response) {
+            return response.json();
+          })
+          .then((response) => {
+            if (response.code === 201) {
+              this.publishingIdle = false;
+              checkPublishing();
+            } else {
+              this.publishingError = response.status;
+            }
+          });
+      },
     },
 
     watch: {
-        videoBitRate(newValue) {
-            if (newValue === null) return;
-            webrtc.sendDataChannelMessage('vb,' + newValue);
-            this.setIntParam("videoBitRate", newValue);
-        },
-        videoFramerate(newValue) {
-            if (newValue === null) return;
-            console.log("video frame rate changed to " + newValue);
-            webrtc.sendDataChannelMessage('_arg_fps,' + newValue);
-            this.setIntParam("videoFramerate", newValue);
-        },
-        audioEnabled(newValue, oldValue) {
-            if (newValue === null) return;
-            console.log("audio enabled changed from " + oldValue + " to " + newValue);
-            if (oldValue !== null && newValue !== oldValue) webrtc.sendDataChannelMessage('_arg_audio,' + newValue);
-            this.setBoolParam("audioEnabled", newValue);
-        },
-        resizeRemote(newValue, oldValue) {
-            if (newValue === null) return;
-            console.log("resize remote changed from " + oldValue + " to " + newValue);
-            app.windowResolution = webrtc.input.getWindowResolution();
-            var res = app.windowResolution[0] + "x" + app.windowResolution[1];
-            if (oldValue !== null && newValue !== oldValue) webrtc.sendDataChannelMessage('_arg_resize,' + newValue + "," + res);
-            this.setBoolParam("resizeRemote", newValue);
-        },
-        scaleLocal(newValue, oldValue) {
-            if (newValue === null) return;
-            console.log("scaleLocal changed from " + oldValue + " to " + newValue);
-            if (oldValue !== null && newValue !== oldValue) {
-                if (newValue === true) {
-                    webrtc.element.setAttribute("class", "video scale");
-                } else {
-                    webrtc.element.setAttribute("class", "video");
-                }
-            }
-            this.setBoolParam("scaleLocal", newValue);
-        },
-        audioBitRate(newValue) {
-            if (newValue === null) return;
-            webrtc.sendDataChannelMessage('ab,' + newValue);
-            this.setIntParam("audioBitRate", newValue);
-        },
-        turnSwitch(newValue, oldValue) {
-            if (newValue === null) return;
-            this.setBoolParam("turnSwitch", newValue);
-            // Reload the page to force read of stored value on first load.
-            if (webrtc === undefined || webrtc.peerConnection === null) return;
-            setTimeout(() => {
-                document.location.reload();
-            }, 700);
-        },
-        debug(newValue, oldValue) {
-            if (newValue === null) return;
-            this.setBoolParam("debug", newValue);
-            // Reload the page to force read of stored value on first load.
-            if (webrtc === undefined || webrtc.peerConnection === null) return;
-            setTimeout(() => {
-                document.location.reload();
-            }, 700);
-        },
-        appName(newValue) {
-            document.title = "Selkies - " + newValue;
-        },
-        showDrawer(newValue) {
-            // Detach inputs when menu is shown.
-            if (newValue === true) {
-                webrtc.input.detach();
-            } else {
-                webrtc.input.attach();
-            }
-        },
+      videoBitRate(newValue) {
+        if (newValue === null) return;
+        webrtc.sendDataChannelMessage("vb," + newValue);
+        this.setIntParam("videoBitRate", newValue);
+      },
+      videoFramerate(newValue) {
+        if (newValue === null) return;
+        console.log("video frame rate changed to " + newValue);
+        webrtc.sendDataChannelMessage("_arg_fps," + newValue);
+        this.setIntParam("videoFramerate", newValue);
+      },
+      audioEnabled(newValue, oldValue) {
+        if (newValue === null) return;
+        console.log(
+          "audio enabled changed from " + oldValue + " to " + newValue
+        );
+        if (oldValue !== null && newValue !== oldValue)
+          webrtc.sendDataChannelMessage("_arg_audio," + newValue);
+        this.setBoolParam("audioEnabled", newValue);
+      },
+      resizeRemote(newValue, oldValue) {
+        if (newValue === null) return;
+        console.log(
+          "resize remote changed from " + oldValue + " to " + newValue
+        );
+        app.windowResolution = webrtc.input.getWindowResolution();
+        var res = app.windowResolution[0] + "x" + app.windowResolution[1];
+        if (oldValue !== null && newValue !== oldValue)
+          webrtc.sendDataChannelMessage("_arg_resize," + newValue + "," + res);
+        this.setBoolParam("resizeRemote", newValue);
+      },
+      scaleLocal(newValue, oldValue) {
+        if (newValue === null) return;
+        console.log("scaleLocal changed from " + oldValue + " to " + newValue);
+        if (oldValue !== null && newValue !== oldValue) {
+          if (newValue === true) {
+            webrtc.element.setAttribute("class", "video scale");
+          } else {
+            webrtc.element.setAttribute("class", "video");
+          }
+        }
+        this.setBoolParam("scaleLocal", newValue);
+      },
+      audioBitRate(newValue) {
+        if (newValue === null) return;
+        webrtc.sendDataChannelMessage("ab," + newValue);
+        this.setIntParam("audioBitRate", newValue);
+      },
+      turnSwitch(newValue, oldValue) {
+        if (newValue === null) return;
+        this.setBoolParam("turnSwitch", newValue);
+        // Reload the page to force read of stored value on first load.
+        if (webrtc === undefined || webrtc.peerConnection === null) return;
+        setTimeout(() => {
+          document.location.reload();
+        }, 700);
+      },
+      debug(newValue, oldValue) {
+        if (newValue === null) return;
+        this.setBoolParam("debug", newValue);
+        // Reload the page to force read of stored value on first load.
+        if (webrtc === undefined || webrtc.peerConnection === null) return;
+        setTimeout(() => {
+          document.location.reload();
+        }, 700);
+      },
+      appName(newValue) {
+        document.title = "Selkies - " + newValue;
+      },
+      showDrawer(newValue) {
+        // Detach inputs when menu is shown.
+        if (newValue === true) {
+          webrtc.input.detach();
+        } else {
+          webrtc.input.attach();
+        }
+      },
     },
 
     updated: () => {
-        document.title = "Selkies - " + app.appName;
+      document.title = "Selkies - " + app.appName;
     },
+  });
 
-});
+  // Fetch debug setting
+  app.debug = app.getBoolParam("debug", false);
 
-// Fetch debug setting
-app.debug = app.getBoolParam("debug", false);
+  // Fetch turn setting
+  app.turnSwitch = app.getBoolParam("turnSwitch", false);
 
-// Fetch turn setting
-app.turnSwitch = app.getBoolParam("turnSwitch", false);
+  // Fetch scale local settings
+  app.scaleLocal = app.getBoolParam("scaleLocal", !app.resizeRemote);
 
-// Fetch scale local settings
-app.scaleLocal = app.getBoolParam("scaleLocal", !app.resizeRemote);
+  var videoElement = document.getElementById("stream");
+  if (videoElement === null) {
+    throw "videoElement not found on page";
+  }
 
-var videoElement = document.getElementById("stream");
-if (videoElement === null) {
-    throw 'videoElement not found on page';
-}
+  // WebRTC entrypoint, connect to the signalling server
+  /*global WebRTCDemoSignalling, WebRTCDemo*/
+  var protocol = location.protocol == "http:" ? "ws://" : "wss://";
+  var signalling = new WebRTCDemoSignalling(
+    new URL(
+      protocol + window.location.host + "/" + app.appName + "/signalling/"
+    ),
+    1
+  );
+  var webrtc = new WebRTCDemo(signalling, videoElement);
 
-// WebRTC entrypoint, connect to the signalling server
-/*global WebRTCDemoSignalling, WebRTCDemo*/
-var protocol = (location.protocol == "http:" ? "ws://" : "wss://");
-var signalling = new WebRTCDemoSignalling(new URL(protocol + window.location.host + "/" + app.appName + "/signalling/"), 1);
-var webrtc = new WebRTCDemo(signalling, videoElement);
-
-// Function to add timestamp to logs.
-var applyTimestamp = (msg) => {
+  // Function to add timestamp to logs.
+  var applyTimestamp = (msg) => {
     var now = new Date();
     var ts = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
     return "[" + ts + "]" + " " + msg;
-}
+  };
 
-// Send signalling status and error messages to logs.
-signalling.onstatus = (message) => {
+  // Send signalling status and error messages to logs.
+  signalling.onstatus = (message) => {
     app.loadingText = message;
     app.logEntries.push(applyTimestamp("[signalling] " + message));
-};
-signalling.onerror = (message) => { app.logEntries.push(applyTimestamp("[signalling] [ERROR] " + message)) };
+  };
+  signalling.onerror = (message) => {
+    app.logEntries.push(applyTimestamp("[signalling] [ERROR] " + message));
+  };
 
-signalling.ondisconnect = () => {
+  signalling.ondisconnect = () => {
     console.log("signalling disconnected");
-    app.status = 'connecting';
+    app.status = "connecting";
     videoElement.style.cursor = "auto";
     webrtc.reset();
-}
+  };
 
-// Send webrtc status and error messages to logs.
-webrtc.onstatus = (message) => { app.logEntries.push(applyTimestamp("[webrtc] " + message)) };
-webrtc.onerror = (message) => { app.logEntries.push(applyTimestamp("[webrtc] [ERROR] " + message)) };
+  // Send webrtc status and error messages to logs.
+  webrtc.onstatus = (message) => {
+    app.logEntries.push(applyTimestamp("[webrtc] " + message));
+  };
+  webrtc.onerror = (message) => {
+    app.logEntries.push(applyTimestamp("[webrtc] [ERROR] " + message));
+  };
 
-if (app.debug) {
-    signalling.ondebug = (message) => { app.debugEntries.push("[signalling] " + message); };
-    webrtc.ondebug = (message) => { app.debugEntries.push(applyTimestamp("[webrtc] " + message)) };
-}
+  if (app.debug) {
+    signalling.ondebug = (message) => {
+      app.debugEntries.push("[signalling] " + message);
+    };
+    webrtc.ondebug = (message) => {
+      app.debugEntries.push(applyTimestamp("[webrtc] " + message));
+    };
+  }
 
-webrtc.ongpustats = (data) => {
+  webrtc.ongpustats = (data) => {
     app.gpuLoad = Math.round(data.load * 100);
     app.gpuMemoryTotal = data.memory_total;
     app.gpuMemoryUsed = data.memory_used;
-}
+  };
 
-// Bind vue status to connection state.
-webrtc.onconnectionstatechange = (state) => {
+  // Bind vue status to connection state.
+  webrtc.onconnectionstatechange = (state) => {
     app.status = state;
 
     if (state === "connected") {
-        // Start watching stats.
-        var videoBytesReceivedStart = 0;
-        var audioBytesReceivedStart = 0;
-        var statsStart = new Date().getTime() / 1000;
-        var statsLoop = () => {
+      // Start watching stats.
+      var videoBytesReceivedStart = 0;
+      var audioBytesReceivedStart = 0;
+      var statsStart = new Date().getTime() / 1000;
+      var statsLoop = () => {
+        webrtc.getConnectionStats().then((stats) => {
+          var now = new Date().getTime() / 1000;
 
-            webrtc.getConnectionStats().then((stats) => {
-                var now = new Date().getTime() / 1000;
+          // Sum of video+audio+server latency in ms.
+          app.connectionLatency = 0;
+          app.connectionLatency += app.serverLatency;
 
-                // Sum of video+audio+server latency in ms.
-                app.connectionLatency = 0;
-                app.connectionLatency += app.serverLatency;
+          // Sum of video+audio packets.
+          app.connectionPacketsReceived = 0;
+          app.connectionPacketsLost = 0;
 
-                // Sum of video+audio packets.
-                app.connectionPacketsReceived = 0;
-                app.connectionPacketsLost = 0;
+          // Connection stats
+          app.connectionStatType = stats.general.connectionType;
+          app.connectionBytesReceived =
+            (stats.general.bytesReceived * 1e-6).toFixed(2) + " MBytes";
+          app.connectionBytesSent =
+            (stats.general.bytesSent * 1e-6).toFixed(2) + " MBytes";
+          app.connectionAvailableBandwidth =
+            (parseInt(stats.general.availableReceiveBandwidth) / 1e6).toFixed(
+              2
+            ) + " mbps";
 
-                // Connection stats
-                app.connectionStatType = stats.general.connectionType;
-                app.connectionBytesReceived = (stats.general.bytesReceived * 1e-6).toFixed(2) + " MBytes";
-                app.connectionBytesSent = (stats.general.bytesSent * 1e-6).toFixed(2) + " MBytes";
-                app.connectionAvailableBandwidth = (parseInt(stats.general.availableReceiveBandwidth) / 1e+6).toFixed(2) + " mbps";
+          // Video stats.
+          app.connectionVideoLatency = parseInt(
+            stats.video.jitterBufferDelay * 1000
+          );
+          app.connectionLatency += stats.video.jitterBufferDelay * 1000;
+          app.connectionPacketsReceived += stats.video.packetsReceived;
+          app.connectionPacketsLost += stats.video.packetsLost;
+          app.connectionCodec = stats.video.codecName;
+          app.connectionVideoDecoder = stats.video.decoder;
+          app.connectionResolution =
+            stats.video.frameWidth + "x" + stats.video.frameHeight;
+          app.connectionFrameRate = stats.video.framesPerSecond;
+          app.connectionVideoBitrate = (
+            (((stats.video.bytesReceived - videoBytesReceivedStart) /
+              (now - statsStart)) *
+              8) /
+            1e6
+          ).toFixed(2);
+          videoBytesReceivedStart = stats.video.bytesReceived;
 
-                // Video stats.
-                app.connectionVideoLatency = parseInt(stats.video.jitterBufferDelay * 1000);
-                app.connectionLatency += stats.video.jitterBufferDelay * 1000;
-                app.connectionPacketsReceived += stats.video.packetsReceived;
-                app.connectionPacketsLost += stats.video.packetsLost;
-                app.connectionCodec = stats.video.codecName;
-                app.connectionVideoDecoder = stats.video.decoder;
-                app.connectionResolution = stats.video.frameWidth + "x" + stats.video.frameHeight;
-                app.connectionFrameRate = stats.video.framesPerSecond;
-                app.connectionVideoBitrate = (((stats.video.bytesReceived - videoBytesReceivedStart) / (now - statsStart)) * 8 / 1e+6).toFixed(2);
-                videoBytesReceivedStart = stats.video.bytesReceived;
+          // Audio stats.
+          if (app.audioEnabled) {
+            app.connectionLatency += stats.audio.jitterBufferDelay * 1000;
+            app.connectionPacketsReceived += stats.audio.packetsReceived;
+            app.connectionPacketsLost += stats.audio.packetsLost;
+            app.connectionAudioLatency = parseInt(
+              stats.audio.jitterBufferDelay * 1000
+            );
+            app.connectionAudioCodecName = stats.audio.codecName;
+            app.connectionAudioBitrate = (
+              (((stats.audio.bytesReceived - audioBytesReceivedStart) /
+                (now - statsStart)) *
+                8) /
+              1e3
+            ).toFixed(2);
+            audioBytesReceivedStart = stats.audio.bytesReceived;
+          } else {
+            app.connectionAudioBitrate = 0;
+            app.connectionAudioCodecName = "NA";
+            app.connectionAudioLatency = "NA";
+          }
 
-                // Audio stats.
-                if (app.audioEnabled) {
-                    app.connectionLatency += stats.audio.jitterBufferDelay * 1000;
-                    app.connectionPacketsReceived += stats.audio.packetsReceived;
-                    app.connectionPacketsLost += stats.audio.packetsLost;
-                    app.connectionAudioLatency = parseInt(stats.audio.jitterBufferDelay * 1000);
-                    app.connectionAudioCodecName = stats.audio.codecName;
-                    app.connectionAudioBitrate = (((stats.audio.bytesReceived - audioBytesReceivedStart) / (now - statsStart)) * 8 / 1e+3).toFixed(2);
-                    audioBytesReceivedStart = stats.audio.bytesReceived;
-                } else {
-                    app.connectionAudioBitrate = 0;
-                    app.connectionAudioCodecName = "NA";
-                    app.connectionAudioLatency = "NA";
-                }
+          // Format latency
+          app.connectionLatency = parseInt(app.connectionLatency);
 
-                // Format latency
-                app.connectionLatency = parseInt(app.connectionLatency);
+          statsStart = now;
 
-                statsStart = now;
-
-                // Stats refresh loop.
-                setTimeout(statsLoop, 1000);
-            });
-        };
-        statsLoop();
+          // Stats refresh loop.
+          setTimeout(statsLoop, 1000);
+        });
+      };
+      statsLoop();
     }
-};
+  };
 
-webrtc.ondatachannelopen = () => {
+  webrtc.ondatachannelopen = () => {
     // Bind gamepad connected handler.
     webrtc.input.ongamepadconnected = (gamepad_id) => {
-        app.gamepadState = "connected";
-        app.gamepadName = gamepad_id;
-    }
+      app.gamepadState = "connected";
+      app.gamepadName = gamepad_id;
+    };
 
     // Bind gamepad disconnect handler.
     webrtc.input.ongamepaddisconnected = () => {
-        app.gamepadState = "disconnected";
-        app.gamepadName = "none";
-    }
+      app.gamepadState = "disconnected";
+      app.gamepadName = "none";
+    };
 
     // Bind input handlers.
     webrtc.input.attach();
 
     // Send client-side metrics over data channel every 5 seconds
     setInterval(() => {
-        if (app.connectionFrameRate === parseInt(app.connectionFrameRate, 10)) webrtc.sendDataChannelMessage('_f,' + app.connectionFrameRate);
-        if (app.connectionLatency === parseInt(app.connectionLatency, 10)) webrtc.sendDataChannelMessage('_l,' + app.connectionLatency);
-    }, 5000)
-}
+      if (app.connectionFrameRate === parseInt(app.connectionFrameRate, 10))
+        webrtc.sendDataChannelMessage("_f," + app.connectionFrameRate);
+      if (app.connectionLatency === parseInt(app.connectionLatency, 10))
+        webrtc.sendDataChannelMessage("_l," + app.connectionLatency);
+    }, 5000);
+  };
 
-webrtc.ondatachannelclose = () => {
+  webrtc.ondatachannelclose = () => {
     webrtc.input.detach();
-}
+  };
 
-webrtc.input.onmenuhotkey = () => {
+  webrtc.input.onmenuhotkey = () => {
     app.showDrawer = !app.showDrawer;
-}
+  };
 
-webrtc.input.onfullscreenhotkey = () => {
+  webrtc.input.onfullscreenhotkey = () => {
     app.enterFullscreen();
-}
+  };
 
-webrtc.input.onresizeend = () => {
+  webrtc.input.onresizeend = () => {
     app.windowResolution = webrtc.input.getWindowResolution();
-    var newRes = parseInt(app.windowResolution[0]/window.devicePixelRatio) + "x" + parseInt(app.windowResolution[1]/window.devicePixelRatio);
-    console.log(`Window size changed: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`);
+    var newRes =
+      parseInt(app.windowResolution[0] / window.devicePixelRatio) +
+      "x" +
+      parseInt(app.windowResolution[1] / window.devicePixelRatio);
+    console.log(
+      `Window size changed: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`
+    );
     webrtc.sendDataChannelMessage("r," + newRes);
-}
+  };
 
-webrtc.onplayvideorequired = () => {
+  webrtc.onplayvideorequired = () => {
     app.showStart = true;
-}
+  };
 
-// Actions to take whenever window changes focus
-window.addEventListener('focus', () => {
+  // Actions to take whenever window changes focus
+  window.addEventListener("focus", () => {
     // reset keyboard to avoid stuck keys.
     webrtc.sendDataChannelMessage("kr");
 
     // Send clipboard contents.
-    navigator.clipboard.readText()
-        .then(text => {
-            webrtc.sendDataChannelMessage("cw," + btoa(text))
-        })
-        .catch(err => {
-            webrtc._setStatus('Failed to read clipboard contents: ' + err);
-        });
-});
-window.addEventListener('blur', () => {
+    navigator.clipboard
+      .readText()
+      .then((text) => {
+        webrtc.sendDataChannelMessage("cw," + btoa(text));
+      })
+      .catch((err) => {
+        webrtc._setStatus("Failed to read clipboard contents: " + err);
+      });
+  });
+  window.addEventListener("blur", () => {
     // reset keyboard to avoid stuck keys.
     webrtc.sendDataChannelMessage("kr");
-});
+  });
 
-webrtc.onclipboardcontent = (content) => {
-    if (app.clipboardStatus === 'enabled') {
-        navigator.clipboard.writeText(content)
-            .catch(err => {
-                app._setDebug('Could not copy text to clipboard: ' + err);
-            });
+  webrtc.onclipboardcontent = (content) => {
+    if (app.clipboardStatus === "enabled") {
+      navigator.clipboard.writeText(content).catch((err) => {
+        app._setDebug("Could not copy text to clipboard: " + err);
+      });
     }
-}
+  };
 
-webrtc.oncursorchange = (handle, curdata, hotspot, override) => {
+  webrtc.oncursorchange = (handle, curdata, hotspot, override) => {
     if (parseInt(handle) === 0) {
-        videoElement.style.cursor = "auto";
-        return;
+      videoElement.style.cursor = "auto";
+      return;
     }
     if (override) {
-        videoElement.style.cursor = override;
-        return;
+      videoElement.style.cursor = override;
+      return;
     }
     if (!webrtc.cursor_cache.has(handle)) {
-        // Add cursor to cache.
-        const cursor_url = "url('data:image/png;base64," + curdata + "')";
-        webrtc.cursor_cache.set(handle, cursor_url);
+      // Add cursor to cache.
+      const cursor_url = "url('data:image/png;base64," + curdata + "')";
+      webrtc.cursor_cache.set(handle, cursor_url);
     }
     var cursor_url = webrtc.cursor_cache.get(handle);
     if (hotspot) {
-        cursor_url += ` ${hotspot.x} ${hotspot.y}, auto`;
+      cursor_url += ` ${hotspot.x} ${hotspot.y}, auto`;
     } else {
-        cursor_url += ", auto";
+      cursor_url += ", auto";
     }
     videoElement.style.cursor = cursor_url;
-}
+  };
 
-webrtc.onsystemaction = (action) => {
+  webrtc.onsystemaction = (action) => {
     webrtc._setStatus("Executing system action: " + action);
-    if (action === 'reload') {
-        setTimeout(() => {
-            // trigger webrtc.reset() by disconnecting from the signalling server.
-            signalling.disconnect();
-        }, 700);
-    } else if (action.startsWith('framerate')) {
-        // Server received framerate setting.
-        const framerateSetting = app.getIntParam("videoFramerate", null);
-        if (framerateSetting !== null) {
-            app.videoFramerate = framerateSetting;
-        } else {
-            // Use the server setting.
-            app.videoFramerate = parseInt(action.split(",")[1]);
+    if (action === "reload") {
+      setTimeout(() => {
+        // trigger webrtc.reset() by disconnecting from the signalling server.
+        signalling.disconnect();
+      }, 700);
+    } else if (action.startsWith("framerate")) {
+      // Server received framerate setting.
+      const framerateSetting = app.getIntParam("videoFramerate", null);
+      if (framerateSetting !== null) {
+        app.videoFramerate = framerateSetting;
+      } else {
+        // Use the server setting.
+        app.videoFramerate = parseInt(action.split(",")[1]);
+      }
+    } else if (action.startsWith("video_bitrate")) {
+      // Server received video bitrate setting.
+      const videoBitrateSetting = app.getIntParam("videoBitRate", null);
+      if (videoBitrateSetting !== null) {
+        // Prefer the user saved value.
+        app.videoBitRate = videoBitrateSetting;
+      } else {
+        // Use the server setting.
+        app.videoBitRate = parseInt(action.split(",")[1]);
+      }
+    } else if (action.startsWith("audio_bitrate")) {
+      // Server received audio bitrate setting.
+      const audioBitrateSetting = app.getIntParam("audioBitRate", null);
+      if (audioBitrateSetting !== null) {
+        // Prefer the user saved value.
+        app.audioBitRate = audioBitrateSetting;
+      } else {
+        // Use the server setting.
+        app.audioBitRate = parseInt(action.split(",")[1]);
+      }
+    } else if (action.startsWith("audio")) {
+      // Server received audio enabled setting.
+      const audioEnabledSetting = app.getBoolParam("audioEnabled", null);
+      if (audioEnabledSetting !== null) {
+        // Prefer the user saved value.
+        app.audioEnabled = audioEnabledSetting;
+      } else {
+        // Use the server setting.
+        app.audioEnabled = action.split(",")[1].toLowerCase() === "true";
+      }
+    } else if (action.startsWith("resize")) {
+      // Remote resize enabled/disabled action.
+      const resizeSetting = app.getBoolParam("resize", null);
+      if (resizeSetting !== null) {
+        // Prefer the user saved value.
+        app.resizeRemote = resizeSetting;
+      } else {
+        // Use server setting.
+        app.resizeRemote = action.split(",")[1].toLowerCase() === "true";
+        if (
+          app.resizeRemote === false &&
+          app.getBoolParam("scaleLocal", null) === null
+        ) {
+          // Enable local scaling if remote resize is disabled and there is no saved value.
+          app.scaleLocal = true;
         }
-    } else if (action.startsWith('video_bitrate')) {
-        // Server received video bitrate setting.
-        const videoBitrateSetting = app.getIntParam("videoBitRate", null);
-        if (videoBitrateSetting !== null) {
-            // Prefer the user saved value.
-            app.videoBitRate = videoBitrateSetting;
-        } else {
-            // Use the server setting.
-            app.videoBitRate = parseInt(action.split(",")[1]);
-        }
-    } else if (action.startsWith('audio_bitrate')) {
-        // Server received audio bitrate setting.
-        const audioBitrateSetting = app.getIntParam("audioBitRate", null);
-        if (audioBitrateSetting !== null) {
-            // Prefer the user saved value.
-            app.audioBitRate = audioBitrateSetting
-        } else {
-            // Use the server setting.
-            app.audioBitRate = parseInt(action.split(",")[1]);
-        }
-    } else if (action.startsWith('audio')) {
-        // Server received audio enabled setting.
-        const audioEnabledSetting = app.getBoolParam("audioEnabled" , null);
-        if (audioEnabledSetting !== null) {
-            // Prefer the user saved value.
-            app.audioEnabled = audioEnabledSetting;
-        } else {
-            // Use the server setting.
-            app.audioEnabled = (action.split(",")[1].toLowerCase() === 'true');
-        }
-    } else if (action.startsWith('resize')) {
-        // Remote resize enabled/disabled action.
-        const resizeSetting = app.getBoolParam("resize", null);
-        if (resizeSetting !== null) {
-            // Prefer the user saved value.
-            app.resizeRemote = resizeSetting;
-        } else {
-            // Use server setting.
-            app.resizeRemote = (action.split(",")[1].toLowerCase() === 'true');
-            if (app.resizeRemote === false && app.getBoolParam("scaleLocal", null) === null) {
-                // Enable local scaling if remote resize is disabled and there is no saved value.
-                app.scaleLocal = true;
-            }
-        }
+      }
 
-        // Send initial window size.
-        if (app.resizeRemote === true) {
-            app.windowResolution = webrtc.input.getWindowResolution();
-            var newRes = parseInt(app.windowResolution[0]/window.devicePixelRatio) + "x" + parseInt(app.windowResolution[1]/window.devicePixelRatio);
-            console.log(`Initial window resolution: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`);
-            webrtc.sendDataChannelMessage("r," + newRes);
-        }
+      // Send initial window size.
+      if (app.resizeRemote === true) {
+        app.windowResolution = webrtc.input.getWindowResolution();
+        var newRes =
+          parseInt(app.windowResolution[0] / window.devicePixelRatio) +
+          "x" +
+          parseInt(app.windowResolution[1] / window.devicePixelRatio);
+        console.log(
+          `Initial window resolution: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`
+        );
+        webrtc.sendDataChannelMessage("r," + newRes);
+      }
     } else if (action.startsWith("local_scaling")) {
-        // Local scaling default pushed from server
+      // Local scaling default pushed from server
 
-        // Local scaling enabled/disabled action.
-        const scalingSetting = app.getBoolParam("scaleLocal", null);
-        if (scalingSetting !== null) {
-            // Prefer the user saved value.
-            app.scaleLocal = scalingSetting;
-        } else {
-            // Use server setting.
-            app.scaleLocal = (action.split(",")[1].toLowerCase() === 'true');
-        }
+      // Local scaling enabled/disabled action.
+      const scalingSetting = app.getBoolParam("scaleLocal", null);
+      if (scalingSetting !== null) {
+        // Prefer the user saved value.
+        app.scaleLocal = scalingSetting;
+      } else {
+        // Use server setting.
+        app.scaleLocal = action.split(",")[1].toLowerCase() === "true";
+      }
     } else if (action.startsWith("encoder")) {
-        if (action.split(",")[1].startsWith("x264")) {
-            app.encoderName = "software";
-        } else {
-            app.encoderName = "hardware";
-        }
+      if (action.split(",")[1].startsWith("x264")) {
+        app.encoderName = "software";
+      } else {
+        app.encoderName = "hardware";
+      }
     } else {
-        webrtc._setStatus('Unhandled system action: ' + action);
+      webrtc._setStatus("Unhandled system action: " + action);
     }
-}
+  };
 
-webrtc.onlatencymeasurement = (latency_ms) => {
+  webrtc.onlatencymeasurement = (latency_ms) => {
     app.serverLatency = latency_ms;
-}
+  };
 
-webrtc.onsystemstats = (stats) => {
-    if (stats.cpu_percent !== undefined) app.serverCPUUsage = stats.cpu_percent.toFixed(0);
+  webrtc.onsystemstats = (stats) => {
+    if (stats.cpu_percent !== undefined)
+      app.serverCPUUsage = stats.cpu_percent.toFixed(0);
     if (stats.mem_total !== undefined) app.serverMemoryTotal = stats.mem_total;
     if (stats.mem_used !== undefined) app.serverMemoryUsed = stats.mem_used;
-}
+  };
 
-// Safari withou Permission-Api enabled fails here
-if (navigator.permissions) {
-    navigator.permissions.query({
-        name: 'clipboard-read'
-    }).then(permissionStatus => {
+  // Safari withou Permission-Api enabled fails here
+  if (navigator.permissions) {
+    navigator.permissions
+      .query({
+        name: "clipboard-read",
+      })
+      .then((permissionStatus) => {
         // Will be 'granted', 'denied' or 'prompt':
-        if (permissionStatus.state === 'granted') {
-            app.clipboardStatus = 'enabled';
+        if (permissionStatus.state === "granted") {
+          app.clipboardStatus = "enabled";
         }
 
         // Listen for changes to the permission state
         permissionStatus.onchange = () => {
-            if (permissionStatus.state === 'granted') {
-                app.clipboardStatus = 'enabled';
-            }
+          if (permissionStatus.state === "granted") {
+            app.clipboardStatus = "enabled";
+          }
         };
-    });
-}
+      });
+  }
 
-// Check if editing is allowed.
-var checkPublishing = () => {
+  // Check if editing is allowed.
+  var checkPublishing = () => {
     fetch("/publish/" + app.appName)
-        .then((response) => {
-            return response.json();
-        })
-        .then((response) => {
-            if (response.code < 400) {
-                app.publishingAllowed = true;
-                app.publishingIdle = true;
-            }
-            if (response.code === 201) {
-                app.publishingIdle = false;
-                setTimeout(() => {
-                    checkPublishing();
-                }, 1000);
-            }
-        });
-}
-// checkPublishing();
-
-// Fetch RTC configuration containing STUN/TURN servers.
-fetch("/turn/")
-    .then(function (response) {
+      .then((response) => {
         return response.json();
+      })
+      .then((response) => {
+        if (response.code < 400) {
+          app.publishingAllowed = true;
+          app.publishingIdle = true;
+        }
+        if (response.code === 201) {
+          app.publishingIdle = false;
+          setTimeout(() => {
+            checkPublishing();
+          }, 1000);
+        }
+      });
+  };
+  // checkPublishing();
+
+  // Fetch RTC configuration containing STUN/TURN servers.
+  fetch("/turn/")
+    .then(function (response) {
+      return response.json();
     })
     .then((config) => {
-        // for debugging, force use of relay server.
-        webrtc.forceTurn = app.turnSwitch;
+      // for debugging, force use of relay server.
+      webrtc.forceTurn = app.turnSwitch;
 
-        // get initial local resolution
-        app.windowResolution = webrtc.input.getWindowResolution();
+      // get initial local resolution
+      app.windowResolution = webrtc.input.getWindowResolution();
 
-        if (config.iceServers.length > 1) {
-            app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + config.iceServers[1].urls.join(", ")));
-        } else {
-            app.debugEntries.push(applyTimestamp("[app] no TURN servers found."));
-        }
-        webrtc.rtcPeerConfig = config;
-        webrtc.connect();
+      if (config.iceServers.length > 1) {
+        app.debugEntries.push(
+          applyTimestamp(
+            "[app] using TURN servers: " + config.iceServers[1].urls.join(", ")
+          )
+        );
+      } else {
+        app.debugEntries.push(applyTimestamp("[app] no TURN servers found."));
+      }
+      webrtc.rtcPeerConfig = config;
+      webrtc.connect();
     });
+}
