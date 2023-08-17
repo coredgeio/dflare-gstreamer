@@ -8,8 +8,8 @@ const cacheVersion = "CACHE_VERSION";
 var cacheName = 'PWA_CACHE';
 var filesToCache = [
   'index.html?ts=CACHE_VERSION',
-  'icon-192x192.png?ts=CACHE_VERSION',
-  'icon-512x512.png?ts=CACHE_VERSION',
+  'favicon192.png?ts=CACHE_VERSION',
+  'favicon192.png?ts=CACHE_VERSION',
   /* cache assets from app launcher */
   'app.js?ts=CACHE_VERSION',
   'input.js?ts=CACHE_VERSION',
