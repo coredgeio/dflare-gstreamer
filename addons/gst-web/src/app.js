@@ -39,8 +39,6 @@ _keycloak
     runApp();
   });
 
-console.log(_keycloak.token,_keycloak.tokenParsed?.exp,_keycloak.tokenParsed?.token_type,_keycloak.idToken);
-
 function runApp() {
   // Service Worker to support PWA
   window.onload = () => {
@@ -330,7 +328,7 @@ function runApp() {
         }, 700);
       },
       appName(newValue) {
-        document.title = "Dflare - " + newValue;
+        document.title = "Dflare";
       },
       showDrawer(newValue) {
         // Detach inputs when menu is shown.
@@ -343,7 +341,7 @@ function runApp() {
     },
 
     updated: () => {
-      document.title = "Dflare - " + app.appName;
+      document.title = "Dflare";
     },
   });
 
@@ -504,6 +502,8 @@ function runApp() {
       statsLoop();
     }
   };
+
+  _keycloak.updateToken(50)
 
   webrtc.ondatachannelopen = () => {
     // Bind gamepad connected handler.
