@@ -330,7 +330,7 @@ function runApp() {
         }, 700);
       },
       appName(newValue) {
-        document.title = "Selkies - " + newValue;
+        document.title = "Dflare - " + newValue;
       },
       showDrawer(newValue) {
         // Detach inputs when menu is shown.
@@ -343,7 +343,7 @@ function runApp() {
     },
 
     updated: () => {
-      document.title = "Selkies - " + app.appName;
+      document.title = "Dflare - " + app.appName;
     },
   });
 
