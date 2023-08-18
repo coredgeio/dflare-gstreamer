@@ -23,8 +23,8 @@
 // keycloak
 
 const initOptions = {
-  url: "https://ssosit.coredge.io",
-  realm: "cloud",
+  url: "https://jpl-sso.dflare.io/auth",
+  realm: "dflare",
   clientId: "dflare",
   onLoad: "login-required",
 };
@@ -34,34 +34,34 @@ const _keycloak = Keycloak(initOptions);
 // createInstance()
 
 _keycloak
-  .init({onLoad: "login-required", checkLoginIframe: false })
+  .init({ onLoad: "login-required", checkLoginIframe: false })
   .then((res) => {
     // if (res) {
-      runApp();
+    runApp();
 
-      let tokenRefreshInterval = setInterval(() => {
-        _keycloak
-          .updateToken(5)
-          .then((refreshed) => {
-            if (refreshed) {
-              console.log("Token refreshed");
-            } else {
-              console.log("Token not refreshed, or the user is not logged in.");
-            }
-          })
-          .catch((error) => {
-            console.error("Error refreshing token", error);
-          });
-      }, 60000);
+    let tokenRefreshInterval = setInterval(() => {
+      _keycloak
+        .updateToken(5)
+        .then((refreshed) => {
+          if (refreshed) {
+            console.log("Token refreshed");
+          } else {
+            console.log("Token not refreshed, or the user is not logged in.");
+          }
+        })
+        .catch((error) => {
+          console.error("Error refreshing token", error);
+        });
+    }, 60000);
 
-      // Clear the interval and logout when the window is closed
-      const clearToken = () => {
-        clearInterval(tokenRefreshInterval);
-        _keycloak.logout();
-      };
+    // Clear the interval and logout when the window is closed
+    const clearToken = () => {
+      clearInterval(tokenRefreshInterval);
+      _keycloak.logout();
+    };
 
-      window.addEventListener("beforeunload", clearToken);
-      window.addEventListener("unload", clearToken);
+    window.addEventListener("beforeunload", clearToken);
+    window.addEventListener("unload", clearToken);
     // } else {
     //   console.error("Keycloak initialization failed");
     // }
@@ -359,7 +359,11 @@ function runApp() {
         }, 700);
       },
       appName(newValue) {
-        document.title = "Dflare";
+        document.title = "Jio PC";
+        document.querySelector("link[rel='shortcut icon']").href =
+          "/JioCloud_Icon_CMYK.png";
+        document.querySelector("link[rel*='icon']").href =
+          "/JioCloud_Icon_CMYK.png";
       },
       showDrawer(newValue) {
         // Detach inputs when menu is shown.
@@ -372,7 +376,12 @@ function runApp() {
     },
 
     updated: () => {
-      document.title = "Dflare";
+      document.title = "Jio PC";
+
+      document.querySelector("link[rel='shortcut icon']").href =
+        "/JioCloud_Icon_CMYK.png";
+      document.querySelector("link[rel*='icon']").href =
+        "/JioCloud_Icon_CMYK.png";
     },
   });
 
