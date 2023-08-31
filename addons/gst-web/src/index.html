@@ -16,6 +16,10 @@
       font-family: Roboto, Arial, sans;
     }
 
+    body{
+      background-color: black;
+    }
+
     .scrolly textarea {
       min-height: 300px;
       white-space: pre;
@@ -61,6 +65,7 @@
 
     .loading-text {
       margin-top: 1em;
+      color: black
     }
 
     canvas {
@@ -305,7 +310,7 @@
                 <li>Bit rate: <b>{{ connectionAudioBitrate }} kbps</b></li>
               </ul>
               </p>
-              <hr />
+              <!-- <hr /> -->
               <v-textarea bottom class="scrolly" label="Status Logs" readonly :value="logEntries.join('\n\n')">
               </v-textarea>
               <v-textarea bottom class="scrolly" label="Debug Logs" readonly :value="debugEntries.join('\n\n')">
@@ -368,7 +373,7 @@
 
       <div class="loading">
         <div v-if="status === 'failed'">
-          <v-btn v-on:click="location.reload()" color="#E0E0E0">
+          <v-btn v-on:click="location.reload()" color="black">
             reload</v-btn>
           <div class="loading-text">Connection failed.</div>
         </div>
