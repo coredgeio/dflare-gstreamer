@@ -25,7 +25,7 @@
 const initOptions = {
   url: "https://jpl-sso.dflare.io/auth",
   realm: "dflare",
-  clientId: "dflare",
+  clientId: "app",
   onLoad: "login-required",
 };
 
