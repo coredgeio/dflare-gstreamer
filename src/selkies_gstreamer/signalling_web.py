@@ -34,6 +34,9 @@ import base64
 from pathlib import Path
 from http import HTTPStatus
 
+import gzip
+from io import BytesIO as IO
+
 logger = logging.getLogger("signaling")
 web_logger = logging.getLogger("web")
 
@@ -161,10 +164,19 @@ class WebRTCSimpleServer(object):
         data, ttl = self.http_cache.get(full_path, (None, None))
         now = time.time()
         if data is None or now - ttl >= self.cache_ttl:
-            # refresh cache
-            data = open(full_path, 'rb').read()
-            self.http_cache[full_path] = (data, now)
+            # refresh cache and compress it using gzip
+            gzip_buffer = None
+            with open(full_path, 'rb') as file:
+                gzip_buffer = IO()
+                gzip_file = gzip.GzipFile(mode="wb", fileobj=gzip_buffer)
+                gzip_file.writelines(file)
+                gzip_file.close()
+
+            if gzip_buffer is not None:
+                data = gzip_buffer.getvalue()
+                self.http_cache[full_path] = (data, now)
         return data
+
 
     async def process_request(self, server_root, path, request_headers):
         response_headers = [
@@ -232,6 +244,12 @@ class WebRTCSimpleServer(object):
         # Read the whole file into memory and send it out
         body = self.cache_file(full_path)
         response_headers.append(('Content-Length', str(len(body))))
+        response_headers.append(('Cache-Control', "max-age=84600, must-revalidate"))
+
+         # Include the gzip header to let the browser uncompress the files
+        response_headers.append(('Content-Encoding', 'gzip'))
+        response_headers.append(('Vary', 'Accept-Encoding'))
+
         web_logger.info("HTTP GET {} 200 OK".format(path))
         return HTTPStatus.OK, response_headers, body
 
