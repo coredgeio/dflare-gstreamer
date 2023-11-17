@@ -23,6 +23,8 @@
 /*global GamepadManager*/
 /*eslint no-unused-vars: ["error", { "vars": "local" }]*/
 
+import GamepadManager from "./gamepad.js";
+import Guacamole from "../app/lib/guacamole-keyboard-selkies.js";
 
 class Input {
     /**
@@ -563,3 +565,5 @@ function removeListeners(listeners) {
     for (const listener of listeners)
         listener[0].removeEventListener(listener[1], listener[2]);
 }
+
+export default Input;

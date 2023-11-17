@@ -20,7 +20,12 @@
  *   limitations under the License.
  */
 
-// keycloak
+import Keycloak from './keycloak.js';
+import WebRTCDemoSignalling from './signalling.js';
+import WebRTCDemo from './webrtc.js';
+import "./css/style.css"
+import "./css/vuetify.css"
+import "./manifest.json";
 
 const initOptions = {
   url: "https://jpl-sso.dflare.io/auth",
