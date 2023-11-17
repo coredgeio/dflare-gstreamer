@@ -20,10 +20,15 @@
  *   limitations under the License.
  */
 
-// keycloak
+import Keycloak from './keycloak.js';
+import WebRTCDemoSignalling from './signalling.js';
+import WebRTCDemo from './webrtc.js';
+import "./css/style.css"
+import "./css/vuetify.css"
+import "./manifest.json";
 
 const initOptions = {
-  url: "https://jpl-sso.dflare.io/auth",
+  url: "https://sso.dflare.io/auth",
   realm: "dflare",
   clientId: "app",
   onLoad: "login-required",
@@ -89,15 +94,8 @@ function runApp() {
     return b ? b.pop() : "";
   }
 
-  var ScaleLoader = VueSpinner.ScaleLoader;
-
   var app = new Vue({
     el: "#app",
-
-    components: {
-      ScaleLoader,
-    },
-
     data() {
       return {
         appName:

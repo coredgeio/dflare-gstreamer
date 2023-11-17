@@ -24,6 +24,8 @@
 
 /*eslint no-unused-vars: ["error", { "vars": "local" }]*/
 
+import Input from './input.js';
+
 /**
  * @typedef {Object} WebRTCDemo
  * @property {function} ondebug - Callback fired when new debug message is set.
@@ -757,3 +759,5 @@ class WebRTCDemo {
         }
     }
 }
+
+export default WebRTCDemo;

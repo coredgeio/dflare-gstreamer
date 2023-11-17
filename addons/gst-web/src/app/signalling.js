@@ -318,3 +318,5 @@ class WebRTCDemoSignalling {
         this._ws_conn.send(JSON.stringify({ 'sdp': sdp }));
     }
 }
+
+export default WebRTCDemoSignalling;
