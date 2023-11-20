@@ -657,5 +657,15 @@ class WebRTCInput:
                 self.on_client_latency(latencty_ms)
             except:
                 logger.error("failed to parse latency report from client" + str(toks))
+        elif toks[0] == "tz":
+            tz = toks[1]
+            logger.info("Received timezone: {} from client".format(tz))
+            cmd = 'sudo ln -snf "/usr/share/zoneinfo/{}" /etc/localtime && echo {} | sudo tee /etc/timezone'.format(tz, tz)
+            res = subprocess.run(cmd, shell=True)
+
+            if res.returncode == 0:
+                logger.info("Timezone is set")
+            else:
+                logger.info("Failed to set the timezone")
         else:
             logger.info('unknown data channel message: %s' % msg)
