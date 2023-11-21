@@ -5722,7 +5722,7 @@ p {
           user-select: none;
 }
 /** Psuedo */
-.v-btn:before {
+/* .v-btn:before {
   border-radius: inherit;
   color: inherit;
   content: '';
@@ -5733,8 +5733,9 @@ p {
   opacity: 0.12;
   transition: 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
   width: 100%;
-}
+} */
 /** Content */
+
 .v-btn {
   padding: 0 16px;
 }
@@ -5916,7 +5917,7 @@ p {
   left: 16px;
 }
 .v-btn--right {
-  right: 16px;
+  right: -35px;
 }
 /** Disabled */
 .v-btn.v-btn--disabled {
