@@ -98,10 +98,7 @@ function runApp() {
     el: "#app",
     data() {
       return {
-        appName:
-          (window.location.pathname.endsWith("/") &&
-            window.location.pathname.split("/")[1]) ||
-          "webrtc",
+        appName: window.location.pathname + "webrtc",
         videoBitRate: 2000,
         videoBitRateOptions: [
           { text: "250 kb/s", value: 250 },
@@ -402,7 +399,7 @@ function runApp() {
   var protocol = location.protocol == "http:" ? "ws://" : "wss://";
   var signalling = new WebRTCDemoSignalling(
     new URL(
-      protocol + window.location.host + "/" + app.appName + "/signalling/"
+      protocol + window.location.host + app.appName + "/signalling/"
     ),
     1
   );
@@ -803,7 +800,7 @@ function runApp() {
   // checkPublishing();
 
   // Fetch RTC configuration containing STUN/TURN servers.
-  fetch("/turn/")
+  fetch("turn/")
     .then(function (response) {
       return response.json();
     })
