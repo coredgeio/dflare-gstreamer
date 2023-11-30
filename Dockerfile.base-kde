@@ -1,0 +1,194 @@
+# Supported base images: ubuntu:22.04, ubuntu:20.04, ubuntu:18.04
+ARG UBUNTU_RELEASE=20.04
+ARG GSTREAMER_BASE_IMAGE=ghcr.io/selkies-project/selkies-gstreamer/gstreamer
+ARG GSTREAMER_BASE_IMAGE_RELEASE=v1.3.8
+ARG PY_BUILD_IMAGE=mohanj7/python-build:v1.0.1
+ARG WEB_IMAGE=mohanj7/web-img-jio:v1.1.0
+FROM ${GSTREAMER_BASE_IMAGE}:${GSTREAMER_BASE_IMAGE_RELEASE}-ubuntu${UBUNTU_RELEASE} as selkies-gstreamer
+FROM ${PY_BUILD_IMAGE} as selkies-build
+FROM ${WEB_IMAGE} as selkies-web
+FROM ubuntu:${UBUNTU_RELEASE}
+ARG UBUNTU_RELEASE
+
+# Insdtall Selkies-GStreamer system dependencies
+RUN \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+        software-properties-common \
+        gnupg \ 
+        build-essential \
+        python3-pip \
+        python3-dev \
+        python3-gi \
+        python3-setuptools \
+        python3-wheel \
+        tzdata \
+        sudo \
+        udev \
+        xclip \
+        x11-utils \
+        xdotool \
+        wmctrl \
+        jq \
+        gdebi-core \
+        x11-xserver-utils \
+        xserver-xorg-core \
+        libopus0 \
+        libgdk-pixbuf2.0-0 \
+        libsrtp2-1 \
+        libxdamage1 \
+        libxml2-dev \
+        libwebrtc-audio-processing1 \
+        libcairo-gobject2 \
+        pulseaudio \
+        libpulse0 \
+        libpangocairo-1.0-0 \
+        libgirepository1.0-dev \
+        libjpeg-dev \
+        libvpx-dev \
+        zlib1g-dev \
+        x264 \
+        git && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt
+
+# Installing KDE(Kate Desktop Environment) and other GUI packages
+ENV XDG_CURRENT_DESKTOP KDE
+ENV KWIN_COMPOSE N
+# Use sudoedit to change protected files instead of using sudo on kate
+ENV SUDO_EDITOR kate
+RUN mkdir -pm755 /etc/apt/preferences.d && \
+    echo "Package: firefox*\n\
+Pin: release o=Ubuntu*\n\
+Pin-Priority: -1" > /etc/apt/preferences.d/firefox-ppa && \
+    add-apt-repository -y ppa:mozillateam/ppa && \
+    apt-get update && apt-get install --no-install-recommends -y \
+        vim \
+        curl \
+        jq \
+        xvfb \
+        dbus-x11 \
+        xdg-utils \
+        firefox \
+    kde-plasma-desktop \
+        kwin-addons \
+        kwin-x11 \
+        kdeadmin \
+        akregator \
+        ark \
+        baloo-kf5 \
+        breeze-cursor-theme \
+        breeze-icon-theme \
+        debconf-kde-helper \
+        colord-kde \
+        desktop-file-utils \
+        filelight \
+        gwenview \
+        hspell \
+        kaddressbook \
+        kaffeine \
+        kate \
+        kcalc \
+        kcharselect \
+        kdeconnect \
+        kde-spectacle \
+        kdf \
+        kget \
+        kgpg \
+        khelpcenter \
+        khotkeys \
+        kimageformat-plugins \
+        kinfocenter \
+        kio-extras \
+        kleopatra \
+        kmail \
+        kmenuedit \
+        kmix \
+        knotes \
+        kontact \
+        kopete \
+        korganizer \
+        krdc \
+        ktimer \
+        kwalletmanager \
+        librsvg2-common \
+        okular \
+        okular-extra-backends \
+        plasma-dataengines-addons \
+        plasma-discover \
+        plasma-runners-addons \
+        plasma-wallpapers-addons \
+        plasma-widgets-addons \
+        plasma-workspace-wallpapers \
+        qtvirtualkeyboard-plugin \
+        sonnet-plugins \
+        sweeper \
+        systemsettings \
+        xdg-desktop-portal-kde \
+        kubuntu-restricted-extras \
+        kubuntu-wallpapers \
+        pavucontrol-qt \
+        transmission-qt \
+        xkb-data \
+        x11-xkb-utils \
+        x11-xserver-utils \
+        x11-utils \
+        x11-apps \
+        xauth \
+        xbitmaps \
+        xinit \
+        xfonts-base \
+        libxrandr-dev && \
+        rm -rf /var/lib/apt/lists/* && \
+        cp -f /usr/lib/x86_64-linux-gnu/libexec/kf5/start_kdeinit /tmp/ && \
+        rm -f /usr/lib/x86_64-linux-gnu/libexec/kf5/start_kdeinit && \
+        cp -r /tmp/start_kdeinit /usr/lib/x86_64-linux-gnu/libexec/kf5/start_kdeinit && \
+        rm -f /tmp/start_kdeinit
+
+# Install locales to prevent X11 errors
+RUN apt-get clean && \
+    apt-get update && apt-get install --no-install-recommends -y locales && \
+    rm -rf /var/lib/apt/lists/* && \
+    locale-gen en_US.UTF-8
+
+# Install Ubuntu 22.04 specific packages
+RUN if [ "${UBUNTU_RELEASE}" = "22.04" ]; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y xcvt; fi && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install gstreamer distribution
+COPY --from=selkies-gstreamer /opt/gstreamer ./gstreamer
+
+# Install web app
+COPY --from=selkies-web /usr/share/nginx/html ./gst-web
+
+# Update PWA manifest.json with app info and route.
+ARG PWA_APP_NAME="Dflare"
+ARG PWA_APP_SHORT_NAME="Dflare"
+ARG PWA_START_URL="/index.html"
+RUN \
+    sed -i \
+        -e "s|PWA_APP_NAME|${PWA_APP_NAME}|g" \
+        -e "s|PWA_APP_SHORT_NAME|${PWA_APP_SHORT_NAME}|g" \
+        -e "s|PWA_START_URL|${PWA_START_URL}|g" \
+    /opt/gst-web/manifest.json &&\
+    sed -i \
+        -e "s|PWA_CACHE|${PWA_APP_SHORT_NAME}-webrtc-pwa|g" \
+    /opt/gst-web/app/sw.js
+
+# Install selkies-gstreamer Python app
+ARG PYPI_PACKAGE=selkies_gstreamer
+ARG PACKAGE_VERSION=1.0.0
+COPY --from=selkies-build /opt/pypi/dist/${PYPI_PACKAGE}-${PACKAGE_VERSION}-py3-none-any.whl .
+RUN pip3 install /opt/${PYPI_PACKAGE}-${PACKAGE_VERSION}-py3-none-any.whl
+
+# Setup global bashrc to configure GStreamer environment
+RUN echo 'export DISPLAY=:0' \
+        >> /etc/bash.bashrc && \
+    echo 'export GST_DEBUG=*:2' \
+        >> /etc/bash.bashrc && \
+    echo 'export GSTREAMER_PATH=/opt/gstreamer' \
+        >> /etc/bash.bashrc && \
+    echo 'source /opt/gstreamer/gst-env' \
+        >> /etc/bash.bashrc
+
+ENV XDG_RUNTIME_DIR /tmp/runtime-user
