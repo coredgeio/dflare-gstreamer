@@ -131,10 +131,9 @@ margin-bottom: 2rem;
    color: #fff;
    width: 100%;
    padding: 1rem;
-   background-color: red;
    text-align: center;
    border-radius: 0.5rem;
-   background-color:#F57E20;
+   background-color:#F57E20 !important;
    text-transform: capitalize;
    font-family: Roboto;
    font-size: 18px;
@@ -161,6 +160,53 @@ margin-bottom: 2rem;
   transform: translate(-50%, -50%);
   z-index: 1;
   }
+
+  @media only screen 
+  and (min-width: 320px) 
+  and (max-width: 1000px)
+  and (-webkit-min-device-pixel-ratio: 2)
+  and (orientation: landscape)
+ {
+     .dashboard--container{
+         justify-content: center;
+         gap: 1rem;
+     }
+     .company--logo {
+      margin-top: 1rem !important;
+      width: 180px !important;
+      height: 35px !important;
+    }
+
+    .cloud--animation{
+      height: 65vh !important;
+    }
+    .progress--bar{
+      padding: 0px !important;
+    }
+    .workspace--start{
+      width: 135px;
+      height: 170px;
+    }
+    .workspace--start img{
+      width: 100%;
+      height: 100%;
+    }
+
+    .workspace--landingpage{
+      margin-bottom: 0rem;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .workspace--start{
+      margin-top: 1rem;
+    }
+
+    .fab-container {
+      top: 40%;
+    }
+  
+}
+
 
   .cloud--animation {
     padding-bottom: 3rem;
