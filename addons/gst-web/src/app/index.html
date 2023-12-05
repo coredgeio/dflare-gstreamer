@@ -259,7 +259,7 @@
            <div v-else>
 <!--              <scale-loader size="200px" :loading="(status !== 'connected')" color="#E0E0E0"></scale-loader> -->
 
-<div v-if="status !== 'connected'" color="#E0E0E0" class="landingpage--container" id="anim--check">
+<div v-if="status !== 'connected'" color="#E0E0E0" class="landingpage--container">
   <!-- <div class="anim--layout"> -->
   <div class="device--container">
     <div class="loader"></div>
@@ -351,29 +351,67 @@
         });
 
 
-        function hideStartPage()
-        {
-          console.log("start page",showStart)
-          let startButton = document.getElementById('start--workspace');
-          if(!showStart){
-            startButton.style.display = "none";
-          }
+        let start__workspace = document.getElementById('start--workspace');
+        if(status === 'connected'){
+          console.log("first",status)
+          start__workspace.style.display = 'none';
+        }else{
+          start__workspace.style.display = 'flex';
         }
 
-        function hideLandingPage()
-        {
-       let anim__layout = document.getElementById('anim--check');
-       console.log("statue",app.status)
+
+function startWorkspaceAnimation()
+{
+
+  document.querySelector('#start--workspace .start--btn').addEventListener('click', function (event) {
+  event.target.style.cursor = 'pointer';
+  var parentDiv = document.querySelector('#start--workspace');
+  parentDiv.style.transition = 'opacity 1s ease-out';
+  parentDiv.style.opacity = '0';
+  setTimeout(function () {
+  }, 1000);
+});
+}
+startWorkspaceAnimation()
+
+
+        // function hideStartPage()
+        // {
+        //   console.log("start page",showStart)
+        //   let startButton = document.getElementById('start--workspace');
+        //   if(!showStart){
+        //     startButton.style.display = "none";
+        //   }
+        // }
+
+        // let nav__drawer = document.getElementById('nav--drawer');
+        // let video_container= document.getElementById('video_container');
+        // nav__drawer.style.display = 'none';
+        // video_container.style.display = 'none';
+        // function hideLandingPage()
+        // {
+      //  let anim__layout = document.getElementById('anim--check');
+      //  console.log("statue",app.status)
       //  var status =  'connected'
       //  if(status)
       //  {
       //   anim__layout.style.backgroundColor = 'red';
       //  }
-        }
+        // }
+        // setTimeout(() =>{
+        //   hideLandingPage()
+        // },5000)
+        // let app__layout = document.getElementById('app')
+        // app__layout.addEventListener(`click`,startButtonAnimaton());
+        
+        // function startButtonAnimaton(){
+        //   console.log("sdfd");
+        //   app__layout.style.backgroundColor = 'red';     
+        // }
 
-        setTimeout(() =>{
-          hideLandingPage()
-        },5000)
+                // let app__layout = document.getElementById('app')
+
+
 
         </script>
     <script src="app/lib/vue-v2.6.9.min.js?ts=1"></script>
