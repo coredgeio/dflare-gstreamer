@@ -117,8 +117,28 @@ html {
     direction: ltr;
   }
 /* Start Page */
+.startpage--theme {
+ position: absolute;
+ width: 100%;
+ height: 100vh;
+ z-index: -1;
 
-.workspace--landingpage{
+}
+.startpage--theme .top-left{
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  transform: rotate(0deg);
+}
+.startpage--theme .bottom-right{
+  transform: rotate(360deg);
+    position: fixed;
+    bottom: -103px;
+    right: 0px;
+}
+
+
+.workspace--startpage{
 display: flex;
 flex-direction: column;
 justify-content: space-between;
@@ -127,7 +147,8 @@ gap: 2.5rem;
 width: 320px;
 margin-bottom: 2rem;
 }
-.workspace--landingpage .start--btn{   
+
+.workspace--startpage .start--btn{   
   letter-spacing: 0em;
   cursor: pointer;
   display: flex;
@@ -139,8 +160,7 @@ margin-bottom: 2rem;
    padding: 1em 1.5em 1em 1.5em;
   color: white;
   text-transform: capitalize;
-  background-color:#F57E20 !important;
-  background: linear-gradient(90deg, rgb(235, 231, 147), rgb(250 194 73), rgb(223, 146, 24));
+  background-color:#F57E20;
   border: none;
   letter-spacing: 0.05em;
   border-radius: 16px;
@@ -214,7 +234,7 @@ margin-bottom: 2rem;
       height: 100%;
     }
 
-    .workspace--landingpage{
+    .workspace--startpage{
       margin-bottom: 0rem;
       gap: 0.5rem;
       justify-content: center;

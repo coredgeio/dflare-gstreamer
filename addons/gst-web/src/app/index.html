@@ -257,7 +257,6 @@
              <div class="loading-text">Connection failed.</div>
            </div>
            <div v-else>
-<!--              <scale-loader size="200px" :loading="(status !== 'connected')" color="#E0E0E0"></scale-loader> -->
 
 <div v-if="status !== 'connected'" color="#E0E0E0" class="landingpage--container">
   <!-- <div class="anim--layout"> -->
@@ -285,19 +284,7 @@
   <!-- <div class="company--logo">
     <img  src ="./dflare-logo.png" alt="Dflare Logo" />
   </div> -->
-  <!-- <div class="cloud--animation"> -->
-    <!-- <dotlottie-player
-      class="lottie--player"
-      src="https://lottie.host/d8944e86-cbcf-4296-b923-17ce92c84a50/i70D9nH27z.json"
-      speed="1"
-      loop
-      autoplay
-      direction="1"
-      mode="normal" 
-    >
-    </dotlottie-player> -->
-  
-     
+  <!-- <div class="cloud--animation"> -->  
     <!-- <div class="progress--bar">
       <div class="lds-ring" >
         <div></div>
@@ -311,12 +298,13 @@
 </div>
 
 <div id="start--workspace" v-if="(status === 'connected' && showStart)" class="dashboard--container">
-  <!-- <div class="company--logo">
-    <img  src="./dflare-logo.png" alt="Dflare Logo" />
-  </div> -->
-  <div class="workspace--landingpage">
+  <div class="startpage--theme">
+    <img class="top-left" src="../app/top-left.svg" alt="top-left image" />
+    <img class="bottom-right"  src="../app/bottom-right.svg" alt="bottom-right image" />
+  </div>
+  <div class="workspace--startpage">
     <div class="workspace--start">
-      <img src="/start-workspace.svg" alt="Start Workspace" />
+      <img src="../app/start-workspace.svg" alt="Image" />
     </div>
     <div v-if="(status !== 'connected')" class="loading-text">{{ loadingText }}</div>
                     <v-btn v-if="(status === 'connected' && showStart)" v-on:click="playVideo()" class="start--btn">
@@ -351,13 +339,13 @@
         });
 
 
-        // let start__workspace = document.getElementById('start--workspace');
-        // if(status === 'connected'){
-        //   console.log("first",status)
-        //   start__workspace.style.display = 'none';
-        // }else{
-        //   start__workspace.style.display = 'flex';
-        // }
+        let landingpage_display = document.getElementsByClassName('landingpage--container');
+        if(status === 'connected'){
+          console.log("first",status)
+          landingpage_display.style.zIndex = '0';
+        }else{
+          landingpage_display.style.zIndex= '1';
+        }
 
 
 function startWorkspaceAnimation()
@@ -411,12 +399,10 @@ startWorkspaceAnimation()
 
                 // let app__layout = document.getElementById('app')
 
+    </script>
 
-
-        </script>
     <script src="app/lib/vue-v2.6.9.min.js?ts=1"></script>
     <script src="app/lib/vuetify-1.5.14.min.js?ts=1"></script>
     <script src="app/sw.js?ts=1"></script>
-    <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
   </body>
    </html>
