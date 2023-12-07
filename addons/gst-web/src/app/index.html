@@ -299,12 +299,12 @@
 
 <div id="start--workspace" v-if="(status === 'connected' && showStart)" class="dashboard--container">
   <div class="startpage--theme">
-    <img class="top-left" src="../app/top-left.svg" alt="top-left image" />
-    <img class="bottom-right"  src="../app/bottom-right.svg" alt="bottom-right image" />
+    <img class="top-left" src="./top-left.svg" alt="top-left image" />
+    <img class="bottom-right"  src="./bottom-right.svg" alt="bottom-right image" />
   </div>
   <div class="workspace--startpage">
     <div class="workspace--start">
-      <img src="../app/start-workspace.svg" alt="Image" />
+      <img src="./start-workspace.svg" alt="Image" />
     </div>
     <div v-if="(status !== 'connected')" class="loading-text">{{ loadingText }}</div>
                     <v-btn v-if="(status === 'connected' && showStart)" v-on:click="playVideo()" class="start--btn">
