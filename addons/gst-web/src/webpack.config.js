@@ -1,6 +1,8 @@
 const path = require('path')
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-const { VueLoaderPlugin } = require('vue-loader');
+const TerserPlugin = require('terser-webpack-plugin');
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
 module.exports = {
   target: ["web", "es5"],
@@ -19,46 +21,52 @@ module.exports = {
   },
   module: {
     rules: [
-      {
-        test: /\.vue$/,
-        loader: 'vue-loader',
-      },
-      {
-        test: /\\.js$/,
-        loader: "babel-loader",
-        exclude: "/node_modules/",
-      },
-        
-        {
-          test: /\.css$/,
-          use: ['style-loader', 'css-loader'],
-        },
     
-    ],
+      {
+        test: /\.js$/,
+        loader: 'babel-loader',
+        exclude: /node_modules/,
+      },
+      {
+        test: /\.css$/,
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
+      },
+      {
+        test: /\.(woff|woff2|eot|ttf|otf)$/i,
+        type: 'asset/resource',
+      },
+    ]
   },
 
   output: {
-    path: path.resolve(__dirname, './build'),
-    filename: 'bunde.js'
+    filename: 'app.js',
+    path: path.resolve(__dirname, './build')
   },
   
   devServer: {
     static: path.resolve(__dirname, "./build"),
     compress: true,
-    port: 5501,
+    port: 8808,
     open: true,
   },
 
+ 
   plugins: [
-    new HtmlWebpackPlugin({
-      template: "./app/index.html",
+    new MiniCssExtractPlugin({
+      filename: "style.css"
     }),
-    new VueLoaderPlugin()
+  
+    new HtmlWebpackPlugin({
+      template: './app/index.html',
+      filename: 'index.html',
+      inject: 'body',
+      scriptLoading: 'blocking',
+    })
+   
   ],
-  resolve: {
-    alias: {
-      'vue': 'vue/dist/vue.esm.js',
-    },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin(),new CssMinimizerPlugin()],
   },
  
 }

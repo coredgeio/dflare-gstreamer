@@ -1,9 +1,10 @@
 {
   "name": "gst-web",
   "version": "1.0.0",
+  
   "scripts": {
     "lint": "./node_modules/.bin/eslint --fix .",
-    "start": "webpack serve --config webpack.config.js",
+    "start": "webpack serve --mode development --open",
     "build": "webpack --config webpack.prod.js"
   },
   "dependencies": {
