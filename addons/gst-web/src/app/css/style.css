@@ -203,7 +203,7 @@ margin-bottom: 2rem;
     transform: translate(0%, -50%);
     z-index: 0;
     animation: expand .8s ease;
-    transition: all 0s linear;
+    transition: all 0.8s linear;
   }
 
 @keyframes expand {
@@ -214,6 +214,20 @@ margin-bottom: 2rem;
     transform: translateY(-50%)
   }
 }
+
+.addAnim--workspace{
+  animation: animAdd .8s ease;
+  transition: 3s ease-out;
+}
+@keyframes animAdd{
+  0% {
+    transform: translateY(0%);
+  }
+  100% {
+    opacity: 0.1;
+  }
+}
+
   
 
 

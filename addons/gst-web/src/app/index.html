@@ -341,28 +341,25 @@
         });
 
 
-        let landingpage_display = document.getElementsByClassName('landingpage--container');
-        if(status === 'connected'){
-          console.log("first",status)
-          landingpage_display.style.zIndex = '0';
-        }else{
-          landingpage_display.style.zIndex= '1';
-        }
+        // let landingpage_display = document.getElementsByClassName('landingpage--container');
+        // if(status === 'connected'){
+        //   console.log("first",status)
+        //   landingpage_display.style.zIndex = '0';
+        // }else{
+        //   landingpage_display.style.zIndex= '1';
+        // }
 
 
-function startWorkspaceAnimation()
-{
+    function animSlideLeft()
+  {
+    let dash = document.querySelector('.dashboard--container');
+    dash.classList.add("addAnim--workspace")
+  }
+      
+document.querySelector('.start--btn').addEventListener('click', animSlideLeft )
 
-  document.querySelector('#start--workspace .start--btn').addEventListener('click', function (event) {
-  event.target.style.cursor = 'pointer';
-  var parentDiv = document.querySelector('#start--workspace');
-  parentDiv.style.transition = 'opacity 1s ease-out';
-  parentDiv.style.opacity = '0';
-  setTimeout(function () {
-  }, 1000);
-});
-}
-startWorkspaceAnimation()
+
+ 
 
 
         // function hideStartPage()
@@ -405,6 +402,6 @@ startWorkspaceAnimation()
 
     <script src="app/lib/vue-v2.6.9.min.js?ts=1"></script>
     <script src="app/lib/vuetify-1.5.14.min.js?ts=1"></script>
-    <script src="app/sw.js?ts=1"></script>
+    <script src="app/sw.js"></script>
   </body>
    </html>
