@@ -46,7 +46,7 @@ module.exports = {
   devServer: {
     static: path.resolve(__dirname, "./build"),
     compress: true,
-    port: 8808,
+    port: 8801,
     open: true,
   },
 
