@@ -359,11 +359,11 @@ function runApp() {
         }, 700);
       },
       appName(newValue) {
-        document.title = "Workspace";
+        document.title = "Jio PC";
         document.querySelector("link[rel='shortcut icon']").href =
-          "./workspace-favicon.png";
+          "/JioCloud_Icon_CMYK.png";
         document.querySelector("link[rel*='icon']").href =
-          "./workspace-favicon.png";
+          "/JioCloud_Icon_CMYK.png";
       },
       showDrawer(newValue) {
         // Detach inputs when menu is shown.
@@ -376,11 +376,11 @@ function runApp() {
     },
 
     updated: () => {
-      document.title = "Workspace";
+        document.title = "Jio PC";
       document.querySelector("link[rel='shortcut icon']").href =
-        "./workspace-favicon.png";
+        "/JioCloud_Icon_CMYK.png";
       document.querySelector("link[rel*='icon']").href =
-        "./workspace-favicon.png";
+        "/JioCloud_Icon_CMYK.png";
     },
   });
 
