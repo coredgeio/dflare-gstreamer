@@ -376,9 +376,7 @@ function runApp() {
     },
 
     updated: () => {
-        document.title = "Jio PC";
-      document.querySelector("link[rel='shortcut icon']").href =
-        "/JioCloud_Icon_CMYK.png";
+      document.title = "Jio PC";
       document.querySelector("link[rel*='icon']").href =
         "/JioCloud_Icon_CMYK.png";
     },
