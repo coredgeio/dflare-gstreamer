@@ -242,8 +242,13 @@ function runApp() {
         webrtc.element.parentElement.requestFullscreen();
       },
       playVideo() {
-        webrtc.playVideo();
+        setTimeout(() =>{
+          console.log("clicked");
+          let dash = document.querySelector('.workspace--container');
+          dash.classList.add("addAnim--workspace");
+          webrtc.playVideo();
         this.showStart = false;
+        },500)
       },
       enableClipboard() {
         navigator.clipboard
@@ -372,9 +377,6 @@ function runApp() {
 
     updated: () => {
       document.title = "Jio PC";
-
-      document.querySelector("link[rel='shortcut icon']").href =
-        "/JioCloud_Icon_CMYK.png";
       document.querySelector("link[rel*='icon']").href =
         "/JioCloud_Icon_CMYK.png";
     },
