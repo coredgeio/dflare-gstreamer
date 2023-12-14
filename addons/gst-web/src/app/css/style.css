@@ -211,7 +211,7 @@ line-height: normal;
     top: 0%;
     left: 0%;
     transform: translate(0%, -50%);
-    z-index: 2;
+    z-index: 0;
     animation: expand .8s ease;
     transition: all 0.8s linear;
   }
