@@ -408,6 +408,9 @@ def main():
                         help='Port to start metrics server on')
     parser.add_argument('--debug', action='store_true',
                         help='Enable debug logging')
+    parser.add_argument('--hostname',
+                        default=os.environ.get('HOSTNAME', ''),
+                        help='Hostname of the system')
     args = parser.parse_args()
 
     if os.path.exists(args.json_config):
@@ -522,9 +525,10 @@ def main():
     enable_cursors = args.enable_cursors.lower() == "true"
     cursor_debug = args.debug_cursors.lower() == "true"
     cursor_size = int(args.cursor_size)
+    hostname = args.hostname
 
     # Create instance of app
-    app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate)
+    app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname)
 
     # [END main_setup]
 
@@ -561,6 +565,7 @@ def main():
         app.send_resize_enabled(enable_resize)
         app.send_encoder(app.encoder)
         app.send_cursor_data(app.last_cursor_sent)
+        app.send_hostname(app.hostname)
 
     app.on_data_open = lambda: data_channel_ready()
 
