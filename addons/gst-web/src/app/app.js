@@ -826,6 +826,3 @@ function runApp() {
       webrtc.connect();
     });
 }
-
-
-console.log("first")
