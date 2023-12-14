@@ -133,6 +133,7 @@ function runApp() {
           { text: "256 kb/s", value: 256000 },
           { text: "320 kb/s", value: 320000 },
         ],
+        workspaceName: "",
         showStart: false,
         showDrawer: false,
         logEntries: [],
@@ -743,6 +744,8 @@ function runApp() {
       } else {
         app.encoderName = "hardware";
       }
+    } else if (action.startsWith("hostname")){
+        app.workspaceName = action.split(",")[1]
     } else {
       webrtc._setStatus("Unhandled system action: " + action);
     }

@@ -148,6 +148,16 @@ width: 320px;
 margin-bottom: 2rem;
 }
 
+.workspace--name h2{
+  color: #FFF;
+  text-transform: capitalize;
+font-family: Roboto;
+font-size: 30px;
+font-style: normal;
+font-weight: 500;
+line-height: normal;
+}
+
 
 
 
@@ -158,9 +168,9 @@ margin-bottom: 2rem;
   align-items: center;
   font-family: Roboto;
   font-size: 18px;
-   font-weight: 500;
-   line-height: 21px;
-   padding: 1em 1.5em 1em 1.5em;
+  font-weight: 500;
+  line-height: 21px;
+  padding: 1em 1.5em 1em 1.5em;
   color: white;
   text-transform: capitalize;
   background-color:#F57E20;

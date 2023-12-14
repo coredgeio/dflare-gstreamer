@@ -24,6 +24,7 @@ import base64
 import json
 import logging
 import re
+from subprocess import Popen, PIPE
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -41,7 +42,7 @@ class GSTWebRTCAppError(Exception):
 
 
 class GSTWebRTCApp:
-    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000):
+    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None):
         """Initialize GStreamer WebRTC app.
 
         Initializes GObjects and checks for required plugins.
@@ -65,6 +66,7 @@ class GSTWebRTCApp:
         self.framerate = framerate
         self.video_bitrate = video_bitrate
         self.audio_bitrate = audio_bitrate
+        self.hostname = hostname
 
         # WebRTC ICE and SDP events
         self.on_ice = lambda mlineindex, candidate: logger.warn(
@@ -877,6 +879,19 @@ class GSTWebRTCApp:
                 "mem_total": mem_total,
                 "mem_used": mem_used,
             })
+
+    def send_hostname(self, hostname):
+        """Sends the hostname name
+        """
+
+        if hostname == None:
+            p = Popen(["hostname"], stdout=PIPE, stderr=PIPE)
+            hostname = str(p.stdout)
+        
+        logger.info("sending hostname: " + hostname) 
+
+        self.__send_data_channel_message(
+            "system", {"action": "hostname,"+str(hostname)})
 
     def is_data_channel_ready(self):
         """Checks to see if the data channel is open.
