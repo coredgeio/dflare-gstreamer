@@ -573,14 +573,27 @@ def main():
     app.on_data_message = webrtc_input.on_message
 
     # Send video bitrate messages to app
-    webrtc_input.on_video_encoder_bit_rate = lambda bitrate: set_json_app_argument(args.json_config, "video_bitrate", bitrate) and (app.set_video_bitrate(int(bitrate)))
+    def set_video_bitrate_handler(bitrate):
+        set_json_app_argument(args.json_config, "video_bitrate", bitrate) 
+        app.set_video_bitrate(int(bitrate))
+        
+        # Bitrate being received from client is kbps, convert it to mbps
+        metrics.selected_video_bitrate = int(bitrate) / 1000 
+
+    webrtc_input.on_video_encoder_bit_rate = set_video_bitrate_handler
 
     # Send audio bitrate messages to app
-    webrtc_input.on_audio_encoder_bit_rate = lambda bitrate: set_json_app_argument(args.json_config, "audio_bitrate", bitrate) and app.set_audio_bitrate(int(bitrate))
+    def set_audio_bitrate_handler(bitrate):
+        set_json_app_argument(args.json_config, "audio_bitrate", bitrate) 
+        app.set_audio_bitrate(int(bitrate))
+
+        # Bitrate being received from client is kbps, convert it to mbps
+        metrics.selected_audio_bitrate = int(bitrate) / 1000 
+
+    webrtc_input.on_audio_encoder_bit_rate = set_audio_bitrate_handler
 
     # Send pointer visibility setting to app
-    webrtc_input.on_mouse_pointer_visible = lambda visible: app.set_pointer_visible(
-        visible)
+    webrtc_input.on_mouse_pointer_visible = lambda visible: app.set_pointer_visible(visible)
 
     # Send clipboard contents when requested
     webrtc_input.on_clipboard_read = lambda data: app.send_clipboard_data(data)
@@ -649,6 +662,18 @@ def main():
     # Send client latency to metrics
     webrtc_input.on_client_latency = lambda latency_ms: metrics.set_latency(latency_ms)
 
+    # Send client video bitrate to metrics
+    webrtc_input.on_client_video_bitrate = lambda bitrate: metrics.set_video_bitrate(bitrate)
+
+    # Send client audio bitrate to metrics
+    webrtc_input.on_client_audio_bitrate = lambda bitrate: metrics.set_audio_bitrate(bitrate)
+
+    # Send client available receive bandwidth to metrics 
+    webrtc_input.on_client_available_bandwidth = lambda bandwidth: metrics.set_available_bandwidth(bandwidth)
+
+    # Send client resolution to metrics
+    webrtc_input.on_client_resolution = lambda resolution: metrics.set_resolution(resolution)
+
     # Initialize GPU monitor
     gpu_mon = GPUMonitor(enabled=args.encoder.startswith("nv"))
 
@@ -666,6 +691,10 @@ def main():
         webrtc_input.ping_start = t
         app.send_system_stats(system_mon.cpu_percent, system_mon.mem_total, system_mon.mem_used)
         app.send_ping(t)
+
+        # send the stats to metrics
+        metrics.set_cpu_utilization(int(system_mon.cpu_percent))
+        metrics.set_memory_utilization(round(system_mon.mem_used / (1024 ** 3), 2)) # converting bytes to GB
 
     system_mon.on_timer = on_sysmon_timer
 

@@ -147,6 +147,14 @@ class WebRTCInput:
             'unhandled on_ping_response')
         self.on_cursor_change = lambda msg: logger.warn(
             'unhandled on_cursor_change')
+        self.on_client_video_bitrate = lambda bitrate: logger.warn(
+            'unhandled on_client_video_bitrate')
+        self.on_client_audio_bitrate = lambda bitrate: logger.warn(
+            'unhandled on_client_audio_bitrate')
+        self.on_client_available_bandwidth = lambda bandwidth: logger.warn(
+            'unhandled on_client_available_bandwidth')
+        self.on_client_resolution = lambda resolution: logger.warn(
+            'unhandled on_client_resolution')
 
     def __keyboard_connect(self):
         self.keyboard = pynput.keyboard.Controller()
@@ -657,6 +665,32 @@ class WebRTCInput:
                 self.on_client_latency(latencty_ms)
             except:
                 logger.error("failed to parse latency report from client" + str(toks))
+        elif toks[0] == "_vbr":
+            try:
+                video_bitrate = float(toks[1])
+                self.on_client_video_bitrate(video_bitrate)
+            except Exception as e:
+                logger.error(str(e) + "failed to parse video bitrate from client: " + str(toks))
+        elif toks[0] == "_abr":
+            try:
+                audio_bitrate = float(toks[1])
+                self.on_client_audio_bitrate(audio_bitrate)
+            except:
+                logger.error("failed to parse audio bitrate from client: " + str(toks))
+        elif toks[0] == "_abw":
+            try:
+                # indicative of the available inbound capacity of the network connection of client/browser
+                available_bandwidth = float(toks[1])
+                self.on_client_available_bandwidth(available_bandwidth)
+            except:
+                logger.error("failed to parse available-bandwidth from client: " + str(toks))
+        elif toks[0] == "_res":
+            try:
+                # indicative of the available inbound capacity of the network connection of client/browser
+                resolution = toks[1]
+                self.on_client_resolution(resolution)
+            except:
+                logger.error("failed to parse resolution from client: " + str(toks))
         elif toks[0] == "tz":
             tz = toks[1]
             logger.info("Received timezone: {} from client".format(tz))
