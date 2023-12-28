@@ -568,6 +568,11 @@ function runApp() {
         webrtc.sendDataChannelMessage("_f," + app.connectionFrameRate);
       if (app.connectionLatency === parseInt(app.connectionLatency, 10))
         webrtc.sendDataChannelMessage("_l," + app.connectionLatency);
+
+        webrtc.sendDataChannelMessage("_vbr," + app.connectionVideoBitrate);
+        webrtc.sendDataChannelMessage("_abr," + app.connectionAudioBitrate);
+        webrtc.sendDataChannelMessage("_abw," + app.connectionAvailableBandwidth.split(" ")[0]);
+        webrtc.sendDataChannelMessage("_res," + app.connectionResolution)
     }, 5000);
   };
 
