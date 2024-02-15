@@ -25,6 +25,7 @@
 
 import GamepadManager from "./gamepad.js";
 import Guacamole from "../app/lib/guacamole-keyboard-selkies.js";
+import Queue from "./util.js";
 
 class Input {
     /**
@@ -113,10 +114,22 @@ class Input {
          */
         this.onresizeend = null;
 
+        /**
+         * @type {Object}
+         */
+        this._queue = new Queue();
+
         // internal variables used by resize start/end functions.
         this._rtime = null;
         this._rtimeout = false;
         this._rdelta = 500;
+
+        // variables used by mousewhell function.
+        this._allowTrackpadScrolling = true;
+        this._allowThreshold = true;
+        this._smallestDelta = 10000;
+        this._wheelThreshold = 100
+        this._scrollMagnitude = 10;
     }
 
     /**
@@ -162,7 +175,8 @@ class Input {
             mtype,
             this.x,
             this.y,
-            this.buttonMask
+            this.buttonMask,
+            0
         ];
 
         this.send(toks.join(","));
@@ -193,10 +207,69 @@ class Input {
             mtype,
             this.x,
             this.y,
-            this.buttonMask
+            this.buttonMask,
+            0
         ];
 
         this.send(toks.join(","));
+    }
+
+    /**
+     * Drops the threshold if pointer input values are of type mouse pointer
+     */
+    _dropThreshold() {
+        // The values will be higher in magnitude and keeps constant
+        // for pointer devices like mouse
+ 
+        var count = 0;
+        var val1 = this.queue.dequeue();
+        while (!this.queue.isEmpty()) {
+            var valNext = this.queue.dequeue();
+
+            // mouse input values would typically be constant and higher in magnitude, generally 
+            // in the range of 80 to 130
+            if (valNext >= 80 && valNext == val1) {
+                count += 1;
+            }
+            val1 = valNext;
+        }
+        
+         // if we encounter such values for at least three in a row then we assume
+        // the user shifted to mouse pointer device
+        return count >= 2 ? true: false;
+     }
+
+     /**
+     * A wrapper for _mouseWheel to adjusts the scrolling according to pointer device in use
+     * @param {MouseWheelEvent} event
+     */
+     _mouseWheelWrapper(event) {
+        var deltaY = Math.trunc(Math.abs(event.deltaY));
+        if (this.queue.size() < 4) {
+            this.queue.enqueue(deltaY);
+        } 
+
+        if (this.queue.size() == 4) {
+            if (this._dropThreshold()) {
+                // user shifted to mouse pointer so reset the values
+                this.allowThreshold = false;
+                this.smallestDelta = 10000;
+            } else {
+                // setting this variable to true ensures the shift from mouse pointer back to trackpad
+                this.allowThreshold = true;
+            }
+        }
+
+        if (this._allowThreshold && this._allowTrackpadScrolling) {
+            // stop trackpad scroll event until next 50ms
+            this._allowTrackpadScrolling = false;
+            this._mouseWheel(event);
+
+            // when threshold is allowed the scroll events being sent to server is limited
+            setTimeout(() => {this._allowTrackpadScrolling = true}, this._wheelThreshold)
+        } else if (!this._allowThreshold) {
+            this._mouseWheel(event);
+        }
     }
 
     /**
@@ -209,6 +282,19 @@ class Input {
         if (event.deltaY < 0) {
             button = 4;
         }
+
+        var deltaY = Math.abs(Math.trunc(event.deltaY));
+
+        // keep track of smallestDelta as a scale factor
+        if (deltaY < this._smallestDeltaY && deltaY != 0) {
+            this._smallestDeltaY = deltaY;
+        }
+
+       // normalise the delta values by the scale factor
+       deltaY = Math.floor(deltaY / this._smallestDeltaY);
+
+       var magnitude = Math.min(deltaY, this._scrollMagnitude);
+
         var mask = 1 << button;
         var toks;
         // Simulate button press and release.
@@ -221,7 +307,8 @@ class Input {
                 mtype,
                 this.x,
                 this.y,
-                this.buttonMask
+                this.buttonMask,
+                magnitude
             ];
             this.send(toks.join(","));
         }
@@ -453,7 +540,7 @@ class Input {
      */
     attach() {
         this.listeners.push(addListener(this.element, 'resize', this._windowMath, this));
-        this.listeners.push(addListener(this.element, 'mousewheel', this._mouseWheel, this));
+        this.listeners.push(addListener(this.element, 'wheel', this._mouseWheelWrapper, this));
         this.listeners.push(addListener(this.element, 'contextmenu', this._contextMenu, this));
         this.listeners.push(addListener(this.element.parentElement, 'fullscreenchange', this._onFullscreenChange, this));
         this.listeners.push(addListener(document, 'pointerlockchange', this._pointerLock, this));
