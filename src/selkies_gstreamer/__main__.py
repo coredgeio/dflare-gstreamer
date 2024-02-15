@@ -29,6 +29,7 @@ import socket
 import sys
 import time
 import urllib.parse
+import traceback
 
 from watchdog.observers import Observer
 from watchdog.events import FileClosedEvent, FileSystemEventHandler
@@ -770,11 +771,14 @@ def main():
         loop.run_in_executor(None, lambda: system_mon.start())
 
         while True:
+            asyncio.ensure_future(app.handle_bus_calls(), loop=loop)
             loop.run_until_complete(signalling.connect())
             loop.run_until_complete(signalling.start())
+
             app.stop_pipeline()
     except Exception as e:
         logger.error("Caught exception: %s" % e)
+        traceback.print_exc()
         sys.exit(1)
     finally:
         webrtc_input.stop_clipboard()

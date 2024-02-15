@@ -1026,6 +1026,46 @@ class GSTWebRTCApp:
         transceiver.set_property("do-nack", True)
 
         logger.info("pipeline started")
+    
+    def bus_call(self, message):
+        t = message.type
+        if t == Gst.MessageType.EOS:
+            logger.error("End-of-stream\n")
+            return False
+        elif t == Gst.MessageType.ERROR:
+            err, debug = message.parse_error()
+            logger.error("Error: %s: %s\n" % (err, debug))
+            return False
+        elif t == Gst.MessageType.STATE_CHANGED:
+            if isinstance(message.src, Gst.Pipeline):
+                old_state, new_state, pending_state = message.parse_state_changed()
+                logger.info(("Pipeline state changed from %s to %s." %
+                    (old_state.value_nick, new_state.value_nick)))
+                if (old_state.value_nick == "paused" and new_state.value_nick == "ready"):
+                    logger.info("stopping bus message loop")
+                    return False
+        elif t == Gst.MessageType.LATENCY:
+            if self.pipeline:
+                try:
+                    self.pipeline.recalculate_latency()
+                except Exception as e:
+                    logger.warning("failed to recalculate warning, exception: %s" % str(e))
+
+        return True
+
+    async def handle_bus_calls(self):
+        # Start bus call loop
+        running = True
+        bus = None
+        while running:
+            if self.pipeline is not None:
+                bus = self.pipeline.get_bus()
+            if bus is not None:
+                while bus.have_pending():
+                    msg = bus.pop()
+                    if not self.bus_call(msg):
+                        running = False
+            await asyncio.sleep(0.1)
 
     def stop_pipeline(self):
         logger.info("stopping pipeline")
