@@ -127,7 +127,7 @@ class Input {
         // variables used by mousewhell function.
         this._allowTrackpadScrolling = true;
         this._allowThreshold = true;
-        this._smallestDelta = 10000;
+        this._smallestDeltaY = 10000;
         this._wheelThreshold = 100
         this._scrollMagnitude = 10;
     }
@@ -222,9 +222,9 @@ class Input {
         // for pointer devices like mouse
  
         var count = 0;
-        var val1 = this.queue.dequeue();
-        while (!this.queue.isEmpty()) {
-            var valNext = this.queue.dequeue();
+        var val1 = this._queue.dequeue();
+        while (!this._queue.isEmpty()) {
+            var valNext = this._queue.dequeue();
 
             // mouse input values would typically be constant and higher in magnitude, generally 
             // in the range of 80 to 130
@@ -240,16 +240,16 @@ class Input {
      }
 
      /**
-     * A wrapper for _mouseWheel to adjusts the scrolling according to pointer device in use
+     * A wrapper for _mouseWheel to adjust the scrolling according to pointer device in use
      * @param {MouseWheelEvent} event
      */
      _mouseWheelWrapper(event) {
         var deltaY = Math.trunc(Math.abs(event.deltaY));
-        if (this.queue.size() < 4) {
-            this.queue.enqueue(deltaY);
+        if (this._queue.size() < 4) {
+            this._queue.enqueue(deltaY);
         } 
 
-        if (this.queue.size() == 4) {
+        if (this._queue.size() == 4) {
             if (this._dropThreshold()) {
                 // user shifted to mouse pointer so reset the values
                 this.allowThreshold = false;
@@ -261,7 +261,7 @@ class Input {
         }
 
         if (this._allowThreshold && this._allowTrackpadScrolling) {
-            // stop trackpad scroll event until next 50ms
+            // stop trackpad scroll event until next 100ms
             this._allowTrackpadScrolling = false;
             this._mouseWheel(event);
 
