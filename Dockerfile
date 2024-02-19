@@ -2,9 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-FROM python:3-jessie
-
-LABEL maintainer "https://github.com/danisla"
+FROM python:3
 
 # Install build deps
 RUN python3 -m pip install --upgrade build
