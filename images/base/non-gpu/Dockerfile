@@ -1,10 +1,13 @@
+# Supported base images: ubuntu:22.04, ubuntu:20.04
+
 ARG UBUNTU_RELEASE=20.04
 ARG GSTREAMER_BASE_IMAGE=ghcr.io/selkies-project/selkies-gstreamer/gstreamer
-ARG GSTREAMER_BASE_IMAGE_RELEASE=v1.5.2
-# As of now the latest tag points to v1.0.3
+ARG GSTREAMER_BASE_IMAGE_RELEASE=v1.3.8
 ARG DFLARE_STREAMER_RELEASE=latest
-ARG PY_BUILD_IMAGE=mohanj7/python-build:${DFLARE_STREAMER_RELEASE}
-ARG WEB_IMAGE=mohanj7/web-img:${DFLARE_STREAMER_RELEASE}
+# ARG PY_BUILD_IMAGE=mohanj7/python-build:${DFLARE_STREAMER_RELEASE}
+ARG PY_BUILD_IMAGE=mohanj7/python-build-dev-scroll:latest
+# ARG WEB_IMAGE=mohanj7/web-img:${DFLARE_STREAMER_RELEASE}
+ARG WEB_IMAGE=mohanj7/web-img-dev-scroll:latest
 FROM ${GSTREAMER_BASE_IMAGE}:${GSTREAMER_BASE_IMAGE_RELEASE}-ubuntu${UBUNTU_RELEASE} as selkies-gstreamer
 FROM ${PY_BUILD_IMAGE} as selkies-build
 FROM ${WEB_IMAGE} as selkies-web
@@ -14,39 +17,54 @@ ARG UBUNTU_RELEASE
 # Insdtall Selkies-GStreamer system dependencies
 RUN \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-        software-properties-common \
-        curl \
-        apt-utils \
-        gnupg \
+        # System dependencies
         build-essential \
+        curl \
+        gnupg \
+        software-properties-common \
+        sudo \
+        tzdata \
+        # GStreamer dependencies
         python3-pip \
         python3-dev \
         python3-gi \
         python3-setuptools \
         python3-wheel \
-        tzdata \
-        sudo \
         udev \
-        xclip \
-        x11-utils \
-        xdotool \
         wmctrl \
         jq \
         gdebi-core \
+        libgdk-pixbuf2.0-0 \
+        libgtk2.0-bin \
+        libgl-dev \
+        libgles-dev \
+        libglvnd-dev \
+        libgudev-1.0-0 \
+        xclip \
+        x11-utils \
+        xdotool \
         x11-xserver-utils \
         xserver-xorg-core \
-        libopus0 \
-        libgdk-pixbuf2.0-0 \
-        libsrtp2-1 \
+        wayland-protocols \
+        libwayland-dev \
+        libwayland-egl1 \
+        libx11-xcb1 \
+        libxkbcommon0 \
         libxdamage1 \
-        libxml2-dev \
+        libsoup2.4-1 \
+        libsoup-gnome2.4-1 \
+        libsrtp2-1 \
+        lame \
+        libopus0 \
         libwebrtc-audio-processing1 \
-        libcairo-gobject2 \
         pulseaudio \
         libpulse0 \
+        libcairo-gobject2 \
         libpangocairo-1.0-0 \
-        libgirepository1.0-dev \
+        libgirepository-1.0-1 \
+        libopenjp2-7 \
         libjpeg-dev \
+        libwebp-dev \
         libvpx-dev \
         zlib1g-dev \
         x264 \
@@ -60,13 +78,14 @@ ENV XDG_CURRENT_DESKTOP KDE
 ENV KWIN_COMPOSE N
 # Use sudoedit to change protected files instead of using sudo on kate
 ENV SUDO_EDITOR kate
-RUN mkdir -pm755 /etc/apt/preferences.d && echo "Package: firefox*\n\
-Pin: version 1:1snap*\n\
-Pin-Priority: -1" > /etc/apt/preferences.d/firefox-nosnap && \
-    mkdir -pm755 /etc/apt/trusted.gpg.d && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0AB215679C571D1C8325275B9BDB3D89CE49EC21" | gpg --dearmor -o /etc/apt/trusted.gpg.d/mozillateam-ubuntu-ppa.gpg && \
-    mkdir -pm755 /etc/apt/sources.list.d && echo "deb https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu $(grep UBUNTU_CODENAME= /etc/os-release | cut -d= -f2 | tr -d '\"') main" > "/etc/apt/sources.list.d/mozillateam-ubuntu-ppa-$(grep UBUNTU_CODENAME= /etc/os-release | cut -d= -f2 | tr -d '\"').list" && \
+RUN mkdir -pm755 /etc/apt/preferences.d && \
+    echo "Package: firefox*\n\
+Pin: release o=Ubuntu*\n\
+Pin-Priority: -1" > /etc/apt/preferences.d/firefox-ppa && \
+    add-apt-repository -y ppa:mozillateam/ppa && \
     apt-get update && apt-get install --no-install-recommends -y \
         vim \
+        curl \
         jq \
         xvfb \
         dbus-x11 \
@@ -172,7 +191,7 @@ RUN \
         -e "s|PWA_APP_NAME|${PWA_APP_NAME}|g" \
         -e "s|PWA_APP_SHORT_NAME|${PWA_APP_SHORT_NAME}|g" \
         -e "s|PWA_START_URL|${PWA_START_URL}|g" \
-    /opt/gst-web/manifest.json &&\
+    /opt/gst-web/manifest.json && \
     sed -i \
         -e "s|PWA_CACHE|${PWA_APP_SHORT_NAME}-webrtc-pwa|g" \
     /opt/gst-web/app/sw.js
@@ -192,11 +211,11 @@ RUN echo 'export DISPLAY=:0' \
         >> /etc/bash.bashrc && \
     echo 'source /opt/gstreamer/gst-env' \
         >> /etc/bash.bashrc
-
-# The default user name is 'user'
+    
 ARG USERR="user"
 
 # add user 
+ARG TZ=Asia/Kolkata
 RUN groupadd -g 1000 ${USERR} && \
     useradd -u 1000 -g 1000 -m -s /bin/bash ${USERR} && \
     usermod -a -G adm,audio,cdrom,dialout,dip,fax,floppy,input,plugdev,pulse-access,sudo,tape,tty,video,voice ${USERR} && \
@@ -204,16 +223,76 @@ RUN groupadd -g 1000 ${USERR} && \
     chown -R ${USERR}:${USERR} /home/${USERR} && \
     echo "${USERR}:${USERR}" | chpasswd  && \
     passwd -d ${USERR} 
+    # ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime && echo "$TZ" > /etc/timezone
 
 # Add Tini init script - take care of runaway processes
 ENV TINI_VERSION v0.7.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 
+# Set the shared memory to 256MB instead of default 64MB 
+RUN sudo echo "tmpfs /dev/shm tmpfs defaults,size=1024M 0 0" >> /etc/fstab
+
+# By setting up the env variable we can access the 
+# user name in shell scripts
+ENV USER=${USERR}
+
+RUN sudo apt-get update && apt-get install latte-dock
+
+# Remove lock screen
+RUN echo "[Daemon]\n Autolock=false\n LockOnResume=false" > /etc/xdg/kscreenlockerrc
+
+# Install ARC Theme
+RUN sudo add-apt-repository ppa:papirus/papirus-dev
+RUN sudo apt-get update
+RUN sudo apt-get install -y --install-recommends arc-kde
+RUN apt-get install -y nginx 
+
+RUN echo "server { \n\
+    listen 80;   \n\
+    listen [::]:80; \n\
+    location / { \n\
+        alias /usr/share/nginx/html/; \n\ 
+        index  index.html index.htm; \n\
+    } \n\
+    location /turn { \n\
+        proxy_pass http://localhost:8080; \n\ 
+		proxy_http_version 1.1; \n\ 
+    } \n\ 
+    location /webrtc/signalling { \n\ 
+        proxy_pass http://localhost:8080; \n\
+		proxy_http_version 1.1; \n\ 
+        proxy_set_header Upgrade \$http_upgrade; \n\
+        proxy_set_header Connection 'Upgrade'; \n\
+        proxy_set_header Host \$host; \n\ 
+    } \n\
+    location /metrics { \n\
+        proxy_pass http://localhost:8000; \n \
+        proxy_http_version 1.1; \n\
+    } \n\
+    error_page   500 502 503 504  /50x.html; \n\
+    location = /50x.html { \n\
+        alias /usr/share/nginx/html/; \n\
+    } \n\
+}" > /etc/nginx/conf.d/default.conf
+
+ENV GST_WEB_PORT 80 
+ENV PATH_PREFIX /
+RUN cp -r /opt/gst-web/* /usr/share/nginx/html
+RUN rm /etc/nginx/sites-enabled/default
+
+ENV XDG_RUNTIME_DIR /tmp/runtime-user
+ENV HOSTNAME Workspace-test
+ENV SHELL /bin/bash
+
+COPY bookmark-manager.sh /
+COPY configure_ui.sh /
+
 RUN echo "#!/bin/bash\n\
 export DISPLAY=:0\n\
 export GST_DEBUG=*:2\n\
 export GSTREAMER_PATH=/opt/gstreamer\n\
+export XDG_RUNTIME_DIR=/tmp/runtime-user\n\
 source /opt/gstreamer/gst-env\n\
 sudo mount -o remount /dev/shm\n\
 Xvfb -screen :0 8192x4096x24 +extension RANDR +extension GLX +extension MIT-SHM -nolisten tcp -noreset -shmem 2>&1 >/tmp/Xvfb.log &\n\
@@ -228,90 +307,20 @@ sudo -u user chmod 700 /tmp/runtime-user\n\
 sudo ln -snf /dev/ptmx /dev/tty7 \n\
 sudo /etc/init.d/dbus start \n\
 startplasma-x11 &\n\
-kwriteconfig5 --file ~/.config/kdeglobals --group 'KDE' --key 'LookAndFeelPackage' 'com.github.varlesh.arc-darker'\n\
-latte-dock &\n\
+bash /configure_ui.sh\n\
 export WEBRTC_ENCODER=\${WEBRTC_ENCODER:-x264enc}\n\
 export WEBRTC_ENABLE_RESIZE=\${WEBRTC_ENABLE_RESIZE:-true}\n\
-sleep 5s\n\
-kwriteconfig5 --file ~/.config/plasma-org.kde.plasma.desktop-appletsrc --group 'Containments' --group '1' --group 'Wallpaper' --group 'org.kde.image' --group 'General' --key 'Image' 'file:///usr/share/wallpapers/Arc-Mountains/contents/images/8000x4500.png'\n\
-plasmashell --replace &\n\
-# Remove the default bottom panel \n\
-sed -i '/^\[Containments\]\[2\]/,/^$/d' ~/.config/plasma-org.kde.plasma.desktop-appletsrc\n\
-kwriteconfig5 --file ~/.config/latte/Plasma.layout.latte --group 'Containments' --group '1' --group 'General' --key 'maxLength' --delete\n\
-kwriteconfig5 --file ~/.config/latte/Plasma.layout.latte --group 'Containments' --group '1' --group 'General' --key 'splitterPosition' '0'\n\
-kwriteconfig5 --file ~/.config/latte/Plasma.layout.latte --group 'Containments' --group '1' --group 'General' --key 'splitterPosition2' '4'\n\
-# use Plasma dock layout for bottom panel \n\ 
-latte-dock --layout 'Plasma' --replace &\n\
 sudo chown -R \$USER:\$USER /home/\$USER \n\
+sudo mkdir /my-space\n\
 # The file manager process needs to run in order for config file ~/.local/share/user-places.xbel to get generated\n\
 if [[ \${DF_WKS_STORAGE} == 'true' ]]; then dolphin & dolphin_pid=\$!; sleep 1s; bash /bookmark-manager.sh -n 'My Space' -l /my-space && kill \$dolphin_pid; fi\n\
-sudo service nginx start \n\
+sudo service nginx start\n\
 selkies-gstreamer-resize 1280x720\n\
-selkies-gstreamer\n\
+selkies-gstreamer\n\ \n\
 " > /entrypoint.sh && chmod +x /entrypoint.sh
-
-RUN apt-get update && apt-get install -y \
-    latte-dock \
-    wget \
-    nginx
-
-# Setup Nginx configuration to server static files of web interface
-ENV GST_WEB_PORT 80
-ENV PATH_PREFIX /
-RUN cp -r /opt/gst-web/* /usr/share/nginx/html
-RUN rm /etc/nginx/sites-enabled/default
-
-RUN echo "server { \n\
-    listen 80;   \n\
-    listen [::]:80; \n\
-    location / { \n\
-        alias /usr/share/nginx/html/; \n\
-        index  index.html index.htm; \n\
-    } \n\
-    location /turn { \n\
-        proxy_pass http://localhost:8080; \n\
-        proxy_http_version 1.1; \n\
-    } \n\
-    location /metrics { \n\
-        proxy_pass http://localhost:8000; \n \
-        proxy_http_version 1.1; \n\
-    } \n\
-    location /webrtc/signalling { \n\
-        proxy_pass http://localhost:8080; \n\
-        proxy_http_version 1.1; \n\
-        proxy_set_header Upgrade \$http_upgrade; \n\
-        proxy_set_header Connection 'Upgrade'; \n\
-        proxy_set_header Host \$host; \n\
-    } \n\
-    error_page   500 502 503 504  /50x.html; \n\
-    location = /50x.html { \n\
-        alias /usr/share/nginx/html/; \n\
-    } \n\
-}" > /etc/nginx/conf.d/default.conf
-
-# By setting up the env variable we can access the 
-# user name in further templates
-ENV USER=${USERR}
-
-# Set the shared memory to 512MB instead of default 64MB
-RUN sudo echo "tmpfs /dev/shm tmpfs defaults,size=512M 0 0" >> /etc/fstab
-
-# Install virtual keyboard
-RUN sudo apt-get install -y onboard
-RUN sudo mkdir -p /home/${USER}/Desktop && sudo cp /usr/share/applications/onboard.desktop /home/${USERR}/Desktop/
-
-# Remove lock screen
-RUN echo "[Daemon]\n Autolock=false\n LockOnResume=false" > /etc/xdg/kscreenlockerrc
-
-# Install ARC Theme
-RUN sudo add-apt-repository ppa:papirus/papirus
-RUN sudo apt-get update
-RUN sudo apt-get install -y --install-recommends arc-kde
 
 USER ${USERR}
 WORKDIR /home/${USERR}
-ENV XDG_RUNTIME_DIR /tmp/runtime-user
-ENV SHELL /bin/bash
 
 ENTRYPOINT ["/tini", "--"]
 CMD ["/entrypoint.sh"]
