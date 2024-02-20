@@ -2,12 +2,11 @@
 
 ARG UBUNTU_RELEASE=20.04
 ARG GSTREAMER_BASE_IMAGE=ghcr.io/selkies-project/selkies-gstreamer/gstreamer
-ARG GSTREAMER_BASE_IMAGE_RELEASE=v1.3.8
+ARG GSTREAMER_BASE_IMAGE_RELEASE=v1.5.2
+# The latest tag points to v1.1.0
 ARG DFLARE_STREAMER_RELEASE=latest
-# ARG PY_BUILD_IMAGE=mohanj7/python-build:${DFLARE_STREAMER_RELEASE}
-ARG PY_BUILD_IMAGE=mohanj7/python-build-dev-scroll:latest
-# ARG WEB_IMAGE=mohanj7/web-img:${DFLARE_STREAMER_RELEASE}
-ARG WEB_IMAGE=mohanj7/web-img-dev-scroll:latest
+ARG PY_BUILD_IMAGE=mohanj7/python-build:${DFLARE_STREAMER_RELEASE}
+ARG WEB_IMAGE=mohanj7/web-img:${DFLARE_STREAMER_RELEASE}
 FROM ${GSTREAMER_BASE_IMAGE}:${GSTREAMER_BASE_IMAGE_RELEASE}-ubuntu${UBUNTU_RELEASE} as selkies-gstreamer
 FROM ${PY_BUILD_IMAGE} as selkies-build
 FROM ${WEB_IMAGE} as selkies-web

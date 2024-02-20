@@ -1,6 +1,7 @@
 # Ubuntu release versions 22.04, and 20.04 are supported
 ARG UBUNTU_RELEASE=22.04
 ARG DFLARE_STREAMER_RELEASE=latest
+# The latest tag points to v1.1.0
 ARG PY_BUILD_IMAGE=mohanj7/python-build:${DFLARE_STREAMER_RELEASE}
 ARG WEB_IMAGE=mohanj7/web-img:${DFLARE_STREAMER_RELEASE}
 FROM ${PY_BUILD_IMAGE} as selkies-build
@@ -468,7 +469,7 @@ RUN sudo apt-get update
 RUN sudo apt-get install -y --install-recommends arc-kde
 
 # Add custom packages right below this comment, or use FROM in a new container and replace entrypoint.sh or supervisord.conf, and set ENTRYPOINT to /usr/bin/supervisord
-RUN  SELKIES_VERSION=1.3.8 && \
+RUN  SELKIES_VERSION=1.5.2 && \
     cd /opt && curl -fsSL "https://github.com/selkies-project/selkies-gstreamer/releases/download/v${SELKIES_VERSION}/selkies-gstreamer-v${SELKIES_VERSION}-ubuntu$(grep VERSION_ID= /etc/os-release | cut -d= -f2 | tr -d '\"').tgz" | tar -zxf - && \
     # Extract NVRTC dependency, https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/LICENSE.txt
     cd /tmp && curl -fsSL -o nvidia_cuda_nvrtc_linux_x86_64.whl "https://developer.download.nvidia.com/compute/redist/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-11.0.221-cp36-cp36m-linux_x86_64.whl" && unzip -joq -d ./nvrtc nvidia_cuda_nvrtc_linux_x86_64.whl && cd nvrtc && chmod 755 libnvrtc* && find . -maxdepth 1 -type f -name "*libnvrtc.so.*" -exec sh -c 'ln -snf $(basename {}) libnvrtc.so' \; && mv -f libnvrtc* /opt/gstreamer/lib/x86_64-linux-gnu/ && cd /tmp && rm -rf /tmp/*
