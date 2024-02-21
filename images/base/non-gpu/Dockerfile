@@ -123,7 +123,6 @@ Pin-Priority: -1" > /etc/apt/preferences.d/firefox-ppa && \
         kleopatra \
         kmail \
         kmenuedit \
-        kmix \
         knotes \
         kontact \
         kopete \

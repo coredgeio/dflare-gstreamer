@@ -307,7 +307,6 @@ Pin-Priority: -1" > /etc/apt/preferences.d/firefox-nosnap && \
         kio-extras \
         kmag \
         kmenuedit \
-        kmix \
         kmousetool \
         kmouth \
         ksshaskpass \
