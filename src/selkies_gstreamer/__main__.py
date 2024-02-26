@@ -150,6 +150,52 @@ class RTCConfigFileMonitor:
         self.observer.stop()
         self.running = False
 
+class CoturnEnvVarMonitor:
+    def __init__(self, turn_host, turn_port, turn_username, turn_password, turn_protocol='udp', turn_tls=False, period=15):
+        self.turn_host = turn_host
+        self.turn_port = turn_port
+        self.turn_username = turn_username
+        self.turn_password = turn_password
+        self.turn_protocol = turn_protocol
+        self.turn_tls = turn_tls
+
+        self.running = False
+        self.period = period
+
+        self.on_rtc_config = lambda stun_server, turn_servers, rtc_config: logger.warning(
+            "unhandled on_rtc_config")
+        
+    def start(self):
+        self.running = True
+        while self.running:
+            # get the current values
+            up_turn_host = os.environ.get("TURN_HOST")
+            up_turn_port = os.environ.get("TURN_PORT")
+            up_turn_username = os.environ.get("TURN_USERNAME")
+            up_turn_password = os.environ.get("TURN_PASSWORD")
+            up_turn_protocol = os.environ.get("TURN_PROTOCOL")
+            up_turn_tls = os.environ.get("TURN_TLS")
+
+            # if any environment variable changes/updates
+            if (self.turn_host != up_turn_host or self.turn_port != up_turn_port or self.turn_username != up_turn_username
+                    or self.turn_password != up_turn_password or self.turn_protocol != up_turn_protocol or self.turn_tls != up_turn_tls):
+                data = make_turn_rtc_config_json(up_turn_host, up_turn_port, up_turn_username, up_turn_password, up_turn_protocol, up_turn_tls)
+                stun_servers, turn_servers, rtc_config = parse_rtc_config(data)
+                self.on_rtc_config(stun_servers, turn_servers, rtc_config)
+
+                self.turn_host = up_turn_host
+                self.turn_port = up_turn_port
+                self.turn_username = up_turn_username
+                self.turn_password = up_turn_password
+                self.turn_protocol = up_turn_protocol
+                self.turn_tls = up_turn_tls
+
+            time.sleep(self.period)
+
+    def stop(self):
+        self.running = False
+
+
 def make_turn_rtc_config_json(host, port, username, password, protocol='udp', tls=False):
     return """{
   "lifetimeDuration": "86400s",
@@ -758,6 +804,15 @@ def main():
         enabled=using_rtc_config_json)
     rtc_file_mon.on_rtc_config = mon_rtc_config
 
+    # Initialise CoturnEnvVarConfig to periodically refresh the conturn config
+    coturn_env_mon = CoturnEnvVarMonitor(
+        args.turn_host, 
+        args.turn_port, 
+        args.turn_username, 
+        args.turn_password, 
+        turn_protocol, using_turn_tls)
+    coturn_env_mon.on_rtc_config = mon_rtc_config
+
     try:
         server.run()
         metrics.start()
@@ -769,6 +824,7 @@ def main():
         loop.run_in_executor(None, lambda: coturn_mon.start())
         loop.run_in_executor(None, lambda: rtc_file_mon.start())
         loop.run_in_executor(None, lambda: system_mon.start())
+        loop.run_in_executor(None, lambda: coturn_env_mon.start())
 
         while True:
             asyncio.ensure_future(app.handle_bus_calls(), loop=loop)
@@ -788,6 +844,7 @@ def main():
         coturn_mon.stop()
         rtc_file_mon.stop()
         system_mon.stop()
+        coturn_env_mon.stop()
         server.server.close()
         sys.exit(0)
     # [END main_start]
