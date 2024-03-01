@@ -157,7 +157,7 @@ class CoturnEnvVarMonitor:
         self.turn_username = turn_username
         self.turn_password = turn_password
         self.turn_protocol = turn_protocol
-        self.turn_tls = turn_tls
+        self.turn_tls = "true" if turn_tls else "false"
 
         self.running = False
         self.period = period
@@ -173,8 +173,8 @@ class CoturnEnvVarMonitor:
             up_turn_port = os.environ.get("TURN_PORT")
             up_turn_username = os.environ.get("TURN_USERNAME")
             up_turn_password = os.environ.get("TURN_PASSWORD")
-            up_turn_protocol = os.environ.get("TURN_PROTOCOL")
-            up_turn_tls = os.environ.get("TURN_TLS")
+            up_turn_protocol = os.environ.get("TURN_PROTOCOL", "udp")
+            up_turn_tls = os.environ.get("TURN_TLS", "false")
 
             # if any environment variable changes/updates
             if (self.turn_host != up_turn_host or self.turn_port != up_turn_port or self.turn_username != up_turn_username
@@ -544,7 +544,7 @@ def main():
             data = generate_rtc_config(args.turn_host, args.turn_port, args.turn_shared_secret, args.coturn_web_username, turn_protocol, using_turn_tls)
             stun_servers, turn_servers, rtc_config = parse_rtc_config(data)
         elif args.turn_username and args.turn_password:
-            if not args.turn_host and args.turn_port:
+            if not (args.turn_host and args.turn_port):
                 logger.error("missing turn host and turn port")
                 sys.exit(1)
             logger.warning("using legacy non-HMAC TURN credentials.")
