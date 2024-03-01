@@ -650,9 +650,11 @@ def main():
         set_json_app_argument(args.json_config, "framerate", fps)
         curr_fps = app.framerate
         app.set_framerate(fps)
+        metrics.selected_fps = fps
         if fps != curr_fps:
             logger.warning("sending window reload to restart pipeline with new framerate")
             app.send_reload_window()
+
     webrtc_input.on_set_fps = lambda fps: set_fps_handler(fps)
 
     # Write audio enabled arg to local config and then tell client to reload.
