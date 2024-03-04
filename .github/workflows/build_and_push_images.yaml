@@ -1,0 +1,41 @@
+name: Build and Push Docker Images on Release
+
+on:
+  release:
+    type: [published]
+
+jobs:
+  build_and_push:
+    name: Build and push the docker images to container registry
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Login to docker hub
+      run: echo "${{ secrets.DOCKERHUB_PUSH_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
+    
+    - name: Get the release tag
+      run: |
+        echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+    
+    - name: Build and push web-img
+      run: |
+        docker build . --file addons/gst-web/Dockerfile --tag ${{ github.repository }}/web-img:${{ env.TAG }}
+        docker tag ${{ github.repository }}/web-img:${{ env.TAG }} ${{ github.repository }}/web-img:latest
+        docker push ${{ github.repository }}/web-img:${{ env.TAG }}
+        docker push ${{ github.repository }}/web-img:latest
+    
+    - name: Build and push python-build
+      run: |
+        docker build . --tag ${{ github.repository }}/python-build:${{ env.TAG }}
+        docker tag ${{ github.repository }}/python-build:${{ env.TAG }} ${{ github.repository }}/python-build:latest
+        docker push ${{ github.repository }}/python-build:${{ env.TAG }}
+        docker push ${{ github.repository }}/python-build:latest
+    
+    - name: Build and push dstreamer
+      run: |
+        docker build . --file docker-images/base/dstreamer/Dockerfile --tag ${{ github.repository }}/dstreamer:${{ env.TAG }}
+        docker tag ${{ github.repository }}/dstreamer:${{ env.TAG }} ${{ github.repository }}/dstreamer:latest
+        docker push ${{ github.repository }}/dstreamer:${{ env.TAG }}
+        docker push ${{ github.repository }}/dstreamer:latest
