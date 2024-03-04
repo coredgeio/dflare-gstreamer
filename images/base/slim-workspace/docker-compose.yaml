@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  dstreamer:
+    container_name: dstreamer
+    image: dstreamer-test:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile-dstreamer
+    ports:
+      - "8080:80"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /run/pulse:/run/pulse
+    depends_on:
+      - workspace
+    environment:
+      - TURN_HOST=d1.dflare.io
+      - TURN_PORT=3478
+      - TURN_USERNAME=yourusername
+      - TURN_PASSWORD=yourpassword
+    
+  workspace:
+    container_name: workspace
+    image: workspace-test:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile-workspace
+    shm_size: '1gb'
+
+    ## Some applications require privileged access to run, vscode for example.
+    # privileged: true
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /run/pulse:/run/pulse
