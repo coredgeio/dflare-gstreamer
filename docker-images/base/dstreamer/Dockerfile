@@ -1,0 +1,156 @@
+# Supported base images: ubuntu:22.04, ubuntu:20.04
+
+ARG UBUNTU_RELEASE=20.04
+FROM ghcr.io/selkies-project/selkies-gstreamer/gstreamer:v1.5.2-ubuntu${UBUNTU_RELEASE} as selkies-gstreamer
+# The latest tag of python-build and web-img points to v1.1.0
+FROM docker.io/mohanj7/python-build:latest as selkies-build
+FROM docker.io/mohanj7/web-img:latest as selkies-web
+FROM ubuntu:${UBUNTU_RELEASE}
+ARG UBUNTU_RELEASE
+
+# Insdtall Selkies-GStreamer system dependencies
+RUN \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+        # System dependencies
+        build-essential \
+        curl \
+        gnupg \
+        software-properties-common \
+        sudo \
+        tzdata \
+        # GStreamer dependencies
+        python3-pip \
+        python3-dev \
+        python3-gi \
+        python3-setuptools \
+        python3-wheel \
+        udev \
+        wmctrl \
+        jq \
+        gdebi-core \
+        libgdk-pixbuf2.0-0 \
+        libgtk2.0-bin \
+        libgl-dev \
+        libgles-dev \
+        libglvnd-dev \
+        libgudev-1.0-0 \
+        xclip \
+        x11-utils \
+        xdotool \
+        x11-xserver-utils \
+        x11-apps \
+        xserver-xorg-core \
+        wayland-protocols \
+        libwayland-dev \
+        libwayland-egl1 \
+        libx11-xcb1 \
+        libxkbcommon0 \
+        libxdamage1 \
+        libsoup2.4-1 \
+        libsoup-gnome2.4-1 \
+        libsrtp2-1 \
+        lame \
+        libopus0 \
+        libwebrtc-audio-processing1 \
+        pulseaudio \
+        libpulse0 \
+        libcairo-gobject2 \
+        libpangocairo-1.0-0 \
+        libgirepository-1.0-1 \
+        libopenjp2-7 \
+        libjpeg-dev \
+        libwebp-dev \
+        libvpx-dev \
+        zlib1g-dev \
+        x264 \
+        git && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt
+
+# Install Ubuntu 22.04 specific packages
+RUN if [ "${UBUNTU_RELEASE}" = "22.04" ]; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y xcvt; fi && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install gstreamer distribution
+COPY --from=selkies-gstreamer /opt/gstreamer ./gstreamer
+
+# Install web app
+COPY --from=selkies-web /usr/share/nginx/html ./gst-web
+
+# Update PWA manifest.json with app info and route.
+ARG PWA_APP_NAME="Dflare"
+ARG PWA_APP_SHORT_NAME="Dflare"
+ARG PWA_START_URL="/index.html"
+RUN \
+    sed -i \
+        -e "s|PWA_APP_NAME|${PWA_APP_NAME}|g" \
+        -e "s|PWA_APP_SHORT_NAME|${PWA_APP_SHORT_NAME}|g" \
+        -e "s|PWA_START_URL|${PWA_START_URL}|g" \
+    /opt/gst-web/manifest.json && \
+    sed -i \
+        -e "s|PWA_CACHE|${PWA_APP_SHORT_NAME}-webrtc-pwa|g" \
+    /opt/gst-web/app/sw.js
+
+# Install selkies-gstreamer Python app
+ARG PYPI_PACKAGE=selkies_gstreamer
+ARG PACKAGE_VERSION=1.0.0
+COPY --from=selkies-build /opt/pypi/dist/${PYPI_PACKAGE}-${PACKAGE_VERSION}-py3-none-any.whl .
+RUN pip3 install /opt/${PYPI_PACKAGE}-${PACKAGE_VERSION}-py3-none-any.whl
+
+# Add Tini init script - take care of runaway processes
+ENV TINI_VERSION v0.7.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
+
+ARG USER="user"
+# add user 
+ARG TZ=Asia/Kolkata
+RUN groupadd -g 1000 ${USER} && \
+    useradd -u 1000 -g 1000 -m -s /bin/bash ${USER} && \
+    usermod -a -G adm,audio,cdrom,dialout,dip,fax,floppy,input,plugdev,pulse-access,sudo,tape,tty,video,voice ${USER} && \
+    echo "${USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
+    chown -R ${USER}:${USER} /home/${USER} && \
+    echo "${USER}:${USER}" | chpasswd  && \
+    passwd -d ${USER} 
+
+# Setup nginx 
+RUN apt-get update && apt-get install -y nginx
+COPY nginx-default.conf /etc/nginx/conf.d/default.conf
+RUN cp -r /opt/gst-web/* /usr/share/nginx/html
+RUN rm /etc/nginx/sites-enabled/default
+
+# Setup global bashrc to configure GStreamer environment
+RUN echo 'export DISPLAY=:0' \
+        >> /etc/bash.bashrc && \
+    echo 'export GST_DEBUG=*:2' \
+        >> /etc/bash.bashrc && \
+    echo 'export GSTREAMER_PATH=/opt/gstreamer' \
+        >> /etc/bash.bashrc && \
+    echo 'source /opt/gstreamer/gst-env' \
+        >> /etc/bash.bashrc
+
+RUN echo "#!/bin/bash\n\
+export DISPLAY=:0\n\
+export GST_DEBUG=*:2\n\
+export GSTREAMER_PATH=/opt/gstreamer\n\
+export XDG_RUNTIME_DIR=/tmp/runtime-user\n\
+source /opt/gstreamer/gst-env\n\
+until [[ -S /tmp/.X11-unix/X0 ]]; do sleep 1; done && echo 'X Server is ready'\n\
+export PULSE_SERVER=unix:/run/pulse/native\n\
+sudo -u user mkdir -pm700 /tmp/runtime-user\n\
+sudo chown user:user /tmp/runtime-user\n\
+sudo -u user chmod 700 /tmp/runtime-user\n\
+export WEBRTC_ENCODER=\${WEBRTC_ENCODER:-x264enc}\n\
+export WEBRTC_ENABLE_RESIZE=\${WEBRTC_ENABLE_RESIZE:-true}\n\
+sudo chown -R \$USER:\$USER /home/\$USER \n\
+sudo service nginx start\n\
+selkies-gstreamer-resize 1280x720\n\
+selkies-gstreamer\n\
+" > /entrypoint.sh && chmod +x /entrypoint.sh
+
+USER user
+WORKDIR /home/user
+
+ENTRYPOINT ["/tini", "--"]
+CMD ["/entrypoint.sh"]
