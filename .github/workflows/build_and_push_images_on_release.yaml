@@ -1,0 +1,47 @@
+name: Build and Push Docker Images on Release
+
+on:
+  release:
+    type: [published]
+
+jobs:
+  build_and_push_on_release:
+    name: Build and push the docker images to container registry
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Login to Docker Hub
+      env:
+        DOCKER_USER: ${{ secrets.DOCKERHUB_USER }}
+        DOCKER_PWD: ${{ secrets.DOCKERHUB_PUSH_TOKEN }}
+      run: |
+        docker login -u $DOCKER_USER -p $DOCKER_PWD
+    
+    - name: Get the release tag
+      run: |
+        echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+    
+    - name: Build and push web-img
+      run: |
+        cd addons/gst-web
+        docker build . --tag coredgeio/dstreamer-web-img:${{ env.TAG }}
+        docker tag coredgeio/dstreamer-web-img:${{ env.TAG }} coredgeio/dstreamer-web-img:latest
+        docker push coredgeio/dstreamer-web-img:${{ env.TAG }}
+        docker push coredgeio/dstreamer-web-img:latest
+    
+    - name: Build and push python-build
+      run: |
+        docker build . --tag coredgeio/dstreamer-python-build:${{ env.TAG }}
+        docker tag coredgeio/dstreamer-python-build:${{ env.TAG }} coredgeio/dstreamer-python-build:latest
+        docker push coredgeio/dstreamer-python-build:${{ env.TAG }}
+        docker push coredgeio/dstreamer-python-build:latest
+    
+    - name: Build and push dstreamer
+      run: |
+        cd docker-images/base/dstreamer
+        docker build . --tag coredgeio/dstreamer:${{ env.TAG }}
+        docker tag coredgeio/dstreamer:${{ env.TAG }} coredgeio/dstreamer:latest
+        docker push coredgeio/dstreamer:${{ env.TAG }}
+        docker push coredgeio/dstreamer:latest
