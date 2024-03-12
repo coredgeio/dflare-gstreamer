@@ -19,6 +19,7 @@ services:
       - TURN_PORT=3478
       - TURN_USERNAME=yourusername
       - TURN_PASSWORD=yourpassword
+      - DISPLAY=:1
     
   workspace:
     container_name: workspace
@@ -27,6 +28,8 @@ services:
       context: .
       dockerfile: Dockerfile-workspace
     shm_size: '1gb'
+    environment:
+      - DISPLAY=:1
 
     ## Some applications require privileged access to run, vscode for example.
     # privileged: true

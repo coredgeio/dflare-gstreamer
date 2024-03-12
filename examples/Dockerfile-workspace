@@ -55,7 +55,8 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     locale-gen en_US.UTF-8
 
-RUN echo 'export DISPLAY=:0' \
+ENV DISPLAY=:0
+RUN echo 'export DISPLAY=${DISPLAY}' \
         >> /etc/bash.bashrc
 
 ARG USERR="user"
@@ -97,10 +98,10 @@ ENV SHELL /bin/bash
 ENV USER=${USERR}
 
 RUN echo "#!/bin/bash\n\
-export DISPLAY=:0\n\
+export DISPLAY=\${DISPLAY}\n\
 export XDG_RUNTIME_DIR=/tmp/runtime-user\n\
-Xvfb -screen :0 8192x4096x24 +extension RANDR +extension GLX +render -noreset 2>&1 >/tmp/Xvfb.log &\n\
-until [[ -S /tmp/.X11-unix/X0 ]]; do sleep 1; done && echo 'X Server is ready'\n\
+Xvfb \${DISPLAY} -screen :0 8192x4096x24 +extension RANDR +extension GLX +render -noreset 2>&1 >/tmp/Xvfb.log &\n\
+until [[ -S /tmp/.X11-unix/X\${DISPLAY:1} ]]; do sleep 1; done && echo 'X Server is ready'\n\
 export PULSE_SERVER=unix:/run/pulse/native\n\
 sudo /usr/bin/pulseaudio -k >/dev/null 2>&1\n\
 sudo /usr/bin/pulseaudio --daemonize --system --verbose --log-target=file:/tmp/pulseaudio.log --realtime=true --disallow-exit -L 'module-native-protocol-tcp auth-ip-acl=127.0.0.0/8 port=4713 auth-anonymous=1'\n\

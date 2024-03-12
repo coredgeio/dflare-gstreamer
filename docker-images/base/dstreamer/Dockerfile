@@ -120,8 +120,9 @@ COPY nginx-default.conf /etc/nginx/conf.d/default.conf
 RUN cp -r /opt/gst-web/* /usr/share/nginx/html
 RUN rm /etc/nginx/sites-enabled/default
 
+ENV DISPLAY=:0
 # Setup global bashrc to configure GStreamer environment
-RUN echo 'export DISPLAY=:0' \
+RUN echo 'export DISPLAY=${DISPLAY}' \
         >> /etc/bash.bashrc && \
     echo 'export GST_DEBUG=*:2' \
         >> /etc/bash.bashrc && \
@@ -131,12 +132,12 @@ RUN echo 'export DISPLAY=:0' \
         >> /etc/bash.bashrc
 
 RUN echo "#!/bin/bash\n\
-export DISPLAY=:0\n\
+export DISPLAY=\${DISPLAY}\n\
 export GST_DEBUG=*:2\n\
 export GSTREAMER_PATH=/opt/gstreamer\n\
 export XDG_RUNTIME_DIR=/tmp/runtime-user\n\
 source /opt/gstreamer/gst-env\n\
-until [[ -S /tmp/.X11-unix/X0 ]]; do sleep 1; done && echo 'X Server is ready'\n\
+until [[ -S /tmp/.X11-unix/X\${DISPLAY:1} ]]; do sleep 1; done && echo 'X Server is ready'\n\
 export PULSE_SERVER=unix:/run/pulse/native\n\
 sudo -u user mkdir -pm700 /tmp/runtime-user\n\
 sudo chown user:user /tmp/runtime-user\n\
