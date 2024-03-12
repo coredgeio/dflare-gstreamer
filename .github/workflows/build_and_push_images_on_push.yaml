@@ -23,16 +23,16 @@ jobs:
     - name: Build and push web-img
       run: |
         cd addons/gst-web
-        docker build . --tag coredgeio/dstreamer-web-img:latest
-        docker push coredgeio/dstreamer-web-img:latest
+        docker build . --tag coredgeio/dstreamer-web-img:main
+        docker push coredgeio/dstreamer-web-img:main
     
     - name: Build and push python-build
       run: |
-        docker build . --tag coredgeio/dstreamer-python-build:latest
-        docker push coredgeio/dstreamer-python-build:latest
+        docker build . --tag coredgeio/dstreamer-python-build:main
+        docker push coredgeio/dstreamer-python-build:main
     
     - name: Build and push dstreamer
       run: |
         cd docker-images/base/dstreamer
-        docker build . --tag coredgeio/dstreamer:latest
-        docker push coredgeio/dstreamer:latest
+        docker build . --tag coredgeio/dstreamer:main
+        docker push coredgeio/dstreamer:main
