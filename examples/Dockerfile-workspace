@@ -100,7 +100,7 @@ ENV USER=${USERR}
 RUN echo "#!/bin/bash\n\
 export DISPLAY=\${DISPLAY}\n\
 export XDG_RUNTIME_DIR=/tmp/runtime-user\n\
-Xvfb \${DISPLAY} -screen :0 8192x4096x24 +extension RANDR +extension GLX +render -noreset 2>&1 >/tmp/Xvfb.log &\n\
+sudo Xvfb \${DISPLAY} -screen :0 8192x4096x24 +extension RANDR +extension GLX +render -noreset 2>&1 >/tmp/Xvfb.log &\n\
 until [[ -S /tmp/.X11-unix/X\${DISPLAY:1} ]]; do sleep 1; done && echo 'X Server is ready'\n\
 export PULSE_SERVER=unix:/run/pulse/native\n\
 sudo /usr/bin/pulseaudio -k >/dev/null 2>&1\n\

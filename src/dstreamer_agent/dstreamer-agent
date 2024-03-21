@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Define the path to the Unix domain socket
+SOCKET_PATH="/run/dstreamer/agent.sock"
+SOCKET_DIR="$(dirname "$SOCKET_PATH")"
+
+# Ensure that the directory exists
+mkdir -p "$SOCKET_DIR"
+
+# Ensure that the directory exists and is writable
+if [ ! -d "$SOCKET_DIR" ] || [ ! -w "$SOCKET_DIR" ]; then
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - Error: Insufficient permissions for directory $SOCKET_DIR"
+    exit 1
+fi
+
+# Clean up the socket file if it already exists
+rm -f "$SOCKET_PATH"
+
+# Trap to remove the socket file on script termination
+cleanup() {
+    rm -f "$SOCKET_PATH"
+    exit
+}
+trap cleanup SIGINT SIGTERM
+
+# Function to handle shutdown
+shutdown() {
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - Info: Shutting down..."
+
+    # Logout KDE Plasma session
+    qdbus org.kde.ksmserver /KSMServer logout 1 2 1
+
+    # Stop Plasma session
+    pkill -SIGTERM startplasma-x11
+
+    # Stop SDDM
+    pkill -SIGTERM sddm
+
+    # Stop D-Bus session bus
+    pkill -SIGTERM dbus-daemon
+
+    # Stop Xvfb
+    pkill -SIGTERM Xvfb && echo "$(date +'%Y-%m-%d %H:%M:%S') - Info: dead xvfb"
+    sleep 2s
+
+    # Remove dstreamer-agent socket
+    rm -f "$SOCKET_PATH"
+
+    # Run the shutdown command
+    kill -SIGTERM 1
+}
+
+# Listen on the Unix domain socket
+while true; do
+    input=$(nc -lU "$SOCKET_PATH")
+    case "$input" in
+        "shutdown")
+            shutdown
+            exit
+            ;;
+        # Add more commands as needed
+        *)
+            # Echo back the received data
+            echo "$(date +'%Y-%m-%d %H:%M:%S') - Warning: unknown input received: \"$input\""
+            ;;
+    esac
+done
