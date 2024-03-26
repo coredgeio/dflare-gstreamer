@@ -13,12 +13,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-instal
 # Installing KDE(Kate Desktop Environment) and other GUI packages
 ENV XDG_CURRENT_DESKTOP KDE
 ENV KWIN_COMPOSE N
-RUN mkdir -pm755 /etc/apt/preferences.d && \
-    echo "Package: firefox*\n\
-Pin: release o=Ubuntu*\n\
-Pin-Priority: -1" > /etc/apt/preferences.d/firefox-ppa && \
-    add-apt-repository -y ppa:mozillateam/ppa && \
-    apt-get update && apt-get install --no-install-recommends -y \
+RUN mkdir -pm755 /etc/apt/preferences.d && echo "Package: firefox*\n\
+Pin: version 1:1snap*\n\
+Pin-Priority: -1" > /etc/apt/preferences.d/firefox-nosnap && \
+    mkdir -pm755 /etc/apt/trusted.gpg.d && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0AB215679C571D1C8325275B9BDB3D89CE49EC21" | gpg --dearmor -o /etc/apt/trusted.gpg.d/mozillateam-ubuntu-ppa.gpg && \
+    mkdir -pm755 /etc/apt/sources.list.d && echo "deb https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu $(grep UBUNTU_CODENAME= /etc/os-release | cut -d= -f2 | tr -d '\"') main" > "/etc/apt/sources.list.d/mozillateam-ubuntu-ppa-$(grep UBUNTU_CODENAME= /etc/os-release | cut -d= -f2 | tr -d '\"').list" && \
+    apt-get update && apt-get install --no-install-recommends -y \ 
         vim \
         curl \
         jq \
@@ -91,16 +91,19 @@ RUN rm -rf /var/lib/apt/lists/*
 
 COPY configure_ui.sh /
 COPY bookmark-manager.sh /
+COPY ./dstreamer_agent/dstreamer-agent /usr/bin/dstreamer-agent
 
 ENV XDG_RUNTIME_DIR /tmp/runtime-user
 ENV HOSTNAME Workspace-test
 ENV SHELL /bin/bash
 ENV USER=${USERR}
 
+RUN apt-get update && apt-get install -y netcat
+
 RUN echo "#!/bin/bash\n\
 export DISPLAY=\${DISPLAY}\n\
 export XDG_RUNTIME_DIR=/tmp/runtime-user\n\
-Xvfb \${DISPLAY} -screen :0 8192x4096x24 +extension RANDR +extension GLX +render -noreset 2>&1 >/tmp/Xvfb.log &\n\
+sudo Xvfb \${DISPLAY} -screen :0 8192x4096x24 +extension RANDR +extension GLX +render -noreset 2>&1 >/tmp/Xvfb.log &\n\
 until [[ -S /tmp/.X11-unix/X\${DISPLAY:1} ]]; do sleep 1; done && echo 'X Server is ready'\n\
 export PULSE_SERVER=unix:/run/pulse/native\n\
 sudo /usr/bin/pulseaudio -k >/dev/null 2>&1\n\
@@ -114,6 +117,7 @@ sudo /etc/init.d/dbus start \n\
 /usr/bin/startplasma-x11 &\n\
 bash /configure_ui.sh\n\
 sudo mkdir /my-space\n\
+sudo bash /usr/bin/dstreamer-agent &\n\
 # The file manager process needs to run in order for config file ~/.local/share/user-places.xbel to get generated\n\
 if [[ \${DF_WKS_STORAGE} == 'true' ]]; then dolphin & dolphin_pid=\$!; sleep 1s; bash /bookmark-manager.sh -n 'My Space' -l /my-space && kill \$dolphin_pid; fi\n\
 sleep infinity \n\

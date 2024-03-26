@@ -146,6 +146,8 @@ export WEBRTC_ENCODER=\${WEBRTC_ENCODER:-x264enc}\n\
 export WEBRTC_ENABLE_RESIZE=\${WEBRTC_ENABLE_RESIZE:-true}\n\
 sudo chown -R \$USER:\$USER /home/\$USER \n\
 sudo service nginx start\n\
+# Once the socket is available, provide write permission\n\
+until [[ -S /run/dstreamer/agent.sock ]]; do sleep 1; done && sudo chmod 766 /run/dstreamer/agent.sock\n\
 selkies-gstreamer-resize 1280x720\n\
 selkies-gstreamer\n\
 " > /entrypoint.sh && chmod +x /entrypoint.sh

@@ -154,6 +154,10 @@ class WebRTCSimpleServer(object):
         if self.enable_basic_auth:
             if not self.basic_auth_password:
                 raise Exception("missing basic_auth_password when using enable_basic_auth option.")
+            
+        # handlers
+        self.on_action = lambda action: logger.warn("Unhandled on_action for dstreamer agent actions")
+        # self.list_of_actions = ["shutdown"]
 
     ############### Helper functions ###############
 
@@ -221,6 +225,19 @@ class WebRTCSimpleServer(object):
             else:
                 web_logger.warning("HTTP GET {} 404 NOT FOUND - Missing RTC config".format(path))
                 return HTTPStatus.NOT_FOUND, response_headers, b'404 NOT FOUND'
+        
+        logger.info("PATH paths: " + str(path))
+        logger.info("action " + str(path.split("/action/")[1].split("/")[0]))
+
+        if path == '/action/shutdown/':
+            action = path.split("/action/")[1].split("/")[0]
+            # if action not in self.list_of_actions:
+            #     return http.HTTPStatus.BAD_REQUEST, response_headers, b"Invalid action"
+            response = self.on_action(action)
+            if response:
+                return http.HTTPStatus.OK, response_headers, b"OK\n"
+            else:
+                return http.HTTPStatus.INTERNAL_SERVER_ERROR, response_headers, b"Server error"
         
         path = path.split("?")[0]
         if path == '/':
