@@ -41,6 +41,7 @@ from system_monitor import SystemMonitor
 from metrics import Metrics
 from resize import resize_display, get_new_res
 from signalling_web import WebRTCSimpleServer, generate_rtc_config
+from dstreamer_agent import DstreamerAgentClient
 
 logger = logging.getLogger("main")
 logger.setLevel(logging.INFO)
@@ -773,6 +774,21 @@ def main():
     options.turn_tls = using_turn_tls
     options.turn_auth_header_name = args.coturn_auth_header_name
     server = WebRTCSimpleServer(loop, options)
+        
+
+   # Intialize the Dstreamer agent
+    dstreamer_agent = DstreamerAgentClient('/run/dstreamer/agent.sock')
+
+    def dstreamer_agent_action_handler(action):
+        if action != "":
+            reponse = dstreamer_agent.send_command(action)
+
+            # if action is to shutdown then stop gstreamer pipeline
+            if action == "shutdown":
+                app.stop_pipeline()
+
+        return reponse
+    server.on_action = lambda action: dstreamer_agent_action_handler(action)
 
     # Callback method to update turn servers of a running pipeline.
     def mon_rtc_config(stun_servers, turn_servers, rtc_config):

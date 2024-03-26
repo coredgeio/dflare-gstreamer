@@ -12,6 +12,7 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/pulse:/run/pulse
+      - /run/dstreamer:/run/dstreamer/
     depends_on:
       - workspace
     environment:
@@ -36,3 +37,4 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/pulse:/run/pulse
+      - /run/dstreamer:/run/dstreamer/

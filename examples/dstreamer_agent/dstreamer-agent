@@ -28,16 +28,19 @@ shutdown() {
     echo "$(date +'%Y-%m-%d %H:%M:%S') - Info: Shutting down..."
 
     # Logout KDE Plasma session
-    qdbus org.kde.ksmserver /KSMServer logout 1 2 1
+    # qdbus org.kde.ksmserver /KSMServer logout 1 2 1
 
     # Stop Plasma session
     pkill -SIGTERM startplasma-x11
 
     # Stop SDDM
-    pkill -SIGTERM sddm
+    # pkill -SIGTERM sddm
 
     # Stop D-Bus session bus
     pkill -SIGTERM dbus-daemon
+
+    # Stop pulseaudio server 
+    pkill -SIGTERM pulseaudio
 
     # Stop Xvfb
     pkill -SIGTERM Xvfb && echo "$(date +'%Y-%m-%d %H:%M:%S') - Info: dead xvfb"
@@ -46,8 +49,8 @@ shutdown() {
     # Remove dstreamer-agent socket
     rm -f "$SOCKET_PATH"
 
-    # Run the shutdown command
-    kill -SIGTERM 1
+    # Kill the pid of 1st process to make the container exit
+    pkill -SIGTERM 1
 }
 
 # Listen on the Unix domain socket

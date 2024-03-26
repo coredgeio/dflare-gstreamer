@@ -200,6 +200,9 @@
                    <v-switch v-model="resizeRemote" :label="`Resize remote to fit window: ${resizeRemote.toString()}`"></v-switch>
                    <v-switch v-model="scaleLocal" :label="`Scale to fit window: ${scaleLocal.toString()}`"></v-switch>
                  </p>
+
+                 <v-btn color="primary" small v-on:click="shutdown()">Shutdown</v-btn>
+
                  <p>
                    Debugging
                    <v-switch v-model="debug" :label="`Debug logs: ${debug.toString()}`"></v-switch>

@@ -11,9 +11,13 @@ import os
 import logging
 logger = logging.getLogger("dstreamer_agent")
 
+DEFAULT_SOCKET_PATH = '/run/dstreamer/agent.sock'
+
 class DstreamerAgentClient:
+    """Handles communication with dstreamer_agent running on workspace
+    """
     def __init__(self, socket_path):
-        self.socket_path = socket_path
+        self.socket_path = DEFAULT_SOCKET_PATH if not socket_path else socket_path
 
     def send_command(self, command):
         try:
@@ -35,6 +39,9 @@ class DstreamerAgentClient:
             sock.close()
         except Exception as e:
             logger.error(f"Error sending command to socket: {e}")
+            return False
+
+        return True
 
     def shutdown(self):
         self.send_command("shutdown")

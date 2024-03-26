@@ -290,6 +290,19 @@ function runApp() {
             }
           });
       },
+      shutdown() {
+        //console.log("shuting down the workspace container")
+        fetch("action/shutdown/")
+        .then((response) => {
+          return response.json();
+        })
+        .then((response) => {
+          console.log(response);
+        })
+        .catch((err) => {
+          console.log("Error shuting down: ", err)
+        });
+      },
     },
 
     watch: {
