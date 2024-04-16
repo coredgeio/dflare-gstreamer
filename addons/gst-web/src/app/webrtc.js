@@ -181,6 +181,11 @@ class WebRTCDemo {
                 this._send_channel.send(data);
             }
         })
+
+        /**
+         * @type {Object}
+         */
+        this._stream = null;
     }
 
     /**
@@ -671,6 +676,45 @@ class WebRTCDemo {
         }
         this.signalling.connect();
     }
+
+    async get_webcam_input() {
+        this._stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+        });
+
+        console.log("Stream: ", this._stream);
+        console.log("Videos track:", this._stream.getTracks()[0])
+        this.peerConnection.addTrack(this._stream.getTracks()[0])
+    }
+
+    connect_webcam() {
+        // Create the peer connection object and bind callbacks.
+        this.peerConnection = new RTCPeerConnection(this.rtcPeerConfig);
+        this.peerConnection.ontrack = this._ontrack.bind(this);
+        this.peerConnection.onicecandidate = this._onPeerICE.bind(this);
+        this.peerConnection.ondatachannel = this._onPeerdDataChannel.bind(this);
+
+        this.get_webcam_input();
+
+        this.peerConnection.onconnectionstatechange = () => {
+            // Local event handling.
+            this._handleConnectionStateChange(this.peerConnection.connectionState);
+
+            // Pass state to event listeners.
+            this._setConnectionState(this.peerConnection.connectionState);
+        };
+
+        if (this.forceTurn) {
+            this._setStatus("forcing use of TURN server");
+            var config = this.peerConnection.getConfiguration();
+            config.iceTransportPolicy = "relay";
+            this.peerConnection.setConfiguration(config);
+        }
+        this.signalling.connect();
+    }
+
+
 
     /**
      * Attempts to reset the webrtc connection by:

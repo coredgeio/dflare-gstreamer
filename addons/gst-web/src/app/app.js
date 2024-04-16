@@ -27,53 +27,55 @@ import "./css/style.css"
 import "./css/vuetify.css"
 import "./manifest.json";
 
-const initOptions = {
-  url: "https://sso.dflare.io/auth",
-  realm: "dflare",
-  clientId: "app",
-  onLoad: "login-required",
-};
+// const initOptions = {
+//   url: "https://sso.dflare.io/auth",
+//   realm: "dflare",
+//   clientId: "app",
+//   onLoad: "login-required",
+// };
 
-const _keycloak = Keycloak(initOptions);
+// const _keycloak = Keycloak(initOptions);
 
-// createInstance()
+// // createInstance()
 
-_keycloak
-  .init({ onLoad: "login-required", checkLoginIframe: false })
-  .then((res) => {
-    // if (res) {
-    runApp();
+// _keycloak
+//   .init({ onLoad: "login-required", checkLoginIframe: false })
+//   .then((res) => {
+//     // if (res) {
+//     runApp();
 
-    let tokenRefreshInterval = setInterval(() => {
-      _keycloak
-        .updateToken(5)
-        .then((refreshed) => {
-          if (refreshed) {
-            console.log("Token refreshed");
-          } else {
-            console.log("Token not refreshed, or the user is not logged in.");
-          }
-        })
-        .catch((error) => {
-          console.error("Error refreshing token", error);
-        });
-    }, 60000);
+//     let tokenRefreshInterval = setInterval(() => {
+//       _keycloak
+//         .updateToken(5)
+//         .then((refreshed) => {
+//           if (refreshed) {
+//             console.log("Token refreshed");
+//           } else {
+//             console.log("Token not refreshed, or the user is not logged in.");
+//           }
+//         })
+//         .catch((error) => {
+//           console.error("Error refreshing token", error);
+//         });
+//     }, 60000);
 
-    // Clear the interval and logout when the window is closed
-    const clearToken = () => {
-      clearInterval(tokenRefreshInterval);
-      _keycloak.logout();
-    };
+//     // Clear the interval and logout when the window is closed
+//     const clearToken = () => {
+//       clearInterval(tokenRefreshInterval);
+//       _keycloak.logout();
+//     };
 
-    window.addEventListener("beforeunload", clearToken);
-    window.addEventListener("unload", clearToken);
-    // } else {
-    //   console.error("Keycloak initialization failed");
-    // }
-  })
-  .catch((error) => {
-    console.error("Error initializing Keycloak", error);
-  });
+//     window.addEventListener("beforeunload", clearToken);
+//     window.addEventListener("unload", clearToken);
+//     // } else {
+//     //   console.error("Keycloak initialization failed");
+//     // }
+//   })
+//   .catch((error) => {
+//     console.error("Error initializing Keycloak", error);
+//   });
+
+runApp();
 
 function runApp() {
   // Service Worker to support PWA
@@ -125,6 +127,7 @@ function runApp() {
           { text: "100 fps", value: 100 },
         ],
         audioEnabled: true,
+        webcamEnabled: false,
         audioBitRate: 32000,
         audioBitRateOptions: [
           { text: "32 kb/s", value: 32000 },
@@ -319,18 +322,23 @@ function runApp() {
       },
       audioEnabled(newValue, oldValue) {
         if (newValue === null) return;
-        console.log(
-          "audio enabled changed from " + oldValue + " to " + newValue
-        );
+        console.log("audio enabled changed from " + oldValue + " to " + newValue);
         if (oldValue !== null && newValue !== oldValue)
           webrtc.sendDataChannelMessage("_arg_audio," + newValue);
         this.setBoolParam("audioEnabled", newValue);
       },
+      webcamEnabled(newValue, oldValue) {
+        if (newValue === null) return;
+        console.log("webcam enabled changed from " + oldValue + " to " + newValue);
+        if (oldValue !== null && newValue !== oldValue)
+          webrtc.sendDataChannelMessage("_arg_webcam," + newValue);
+        this.setBoolParam("webcamEnabled", newValue);
+
+        webcam_webrtc.connect_webcam();
+      },
       resizeRemote(newValue, oldValue) {
         if (newValue === null) return;
-        console.log(
-          "resize remote changed from " + oldValue + " to " + newValue
-        );
+        console.log("resize remote changed from " + oldValue + " to " + newValue);
         app.windowResolution = webrtc.input.getWindowResolution();
         var res = app.windowResolution[0] + "x" + app.windowResolution[1];
         if (oldValue !== null && newValue !== oldValue)
@@ -413,13 +421,11 @@ function runApp() {
   // WebRTC entrypoint, connect to the signalling server
   /*global WebRTCDemoSignalling, WebRTCDemo*/
   var protocol = location.protocol == "http:" ? "ws://" : "wss://";
-  var signalling = new WebRTCDemoSignalling(
-    new URL(
-      protocol + window.location.host + app.appName + "/signalling/"
-    ),
-    1
-  );
+  var signalling = new WebRTCDemoSignalling(new URL(protocol + window.location.host + app.appName + "/signalling/"), 1);
+  var webcam_signalling = new WebRTCDemoSignalling(new URL(protocol + window.location.host + app.appName + "/signalling/"), 3);
+
   var webrtc = new WebRTCDemo(signalling, videoElement);
+  var webcam_webrtc = new WebRTCDemo(webcam_signalling);
 
   // Function to add timestamp to logs.
   var applyTimestamp = (msg) => {
@@ -445,12 +451,10 @@ function runApp() {
   };
 
   // Send webrtc status and error messages to logs.
-  webrtc.onstatus = (message) => {
-    app.logEntries.push(applyTimestamp("[webrtc] " + message));
-  };
-  webrtc.onerror = (message) => {
-    app.logEntries.push(applyTimestamp("[webrtc] [ERROR] " + message));
-  };
+  webrtc.onstatus = (message) => {app.logEntries.push(applyTimestamp("[webrtc] " + message))};
+  webrtc.onerror = (message) => {app.logEntries.push(applyTimestamp("[webrtc] [ERROR] " + message))};
+  webcam_webrtc.onstatus = (message) => { app.logEntries.push(applyTimestamp("[webcam webrtc] " + message)) };
+  webcam_webrtc.onerror = (message) => { app.logEntries.push(applyTimestamp("[webcam webrtc] [ERROR] " + message)) };
 
   if (app.debug) {
     signalling.ondebug = (message) => {
@@ -830,20 +834,19 @@ function runApp() {
     .then((config) => {
       // for debugging, force use of relay server.
       webrtc.forceTurn = app.turnSwitch;
+      webcam_webrtc.forceTurn = app.turnSwitch;
 
       // get initial local resolution
       app.windowResolution = webrtc.input.getWindowResolution();
 
       if (config.iceServers.length > 1) {
-        app.debugEntries.push(
-          applyTimestamp(
-            "[app] using TURN servers: " + config.iceServers[1].urls.join(", ")
-          )
-        );
+        app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + config.iceServers[1].urls.join(", ")));
       } else {
         app.debugEntries.push(applyTimestamp("[app] no TURN servers found."));
       }
       webrtc.rtcPeerConfig = config;
       webrtc.connect();
+
+      webcam_webrtc.rtcPeerConfig = config;
     });
 }

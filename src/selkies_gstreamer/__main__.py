@@ -496,12 +496,19 @@ def main():
     # Peer id for this app, default is 0, expecting remote peer id to be 1
     my_id = 0
     peer_id = 1
+    my_webcam_id = 2
+    peer_webcam_id =3
 
     # Initialize metrics server.
     metrics = Metrics(int(args.metrics_port))
 
     # Initialize the signalling client
     signalling = WebRTCSignalling('ws://127.0.0.1:%s/ws' % args.port, my_id, peer_id,
+        enable_basic_auth=args.enable_basic_auth.lower() == 'true',
+        basic_auth_user=args.basic_auth_user,
+        basic_auth_password=args.basic_auth_password)
+    
+    webcam_signalling = WebRTCSignalling('ws://127.0.0.1:%s/ws' % args.port, my_webcam_id, peer_webcam_id,
         enable_basic_auth=args.enable_basic_auth.lower() == 'true',
         basic_auth_user=args.basic_auth_user,
         basic_auth_password=args.basic_auth_password)
@@ -515,12 +522,25 @@ def main():
        else:
            logger.error("signalling error: %s", str(e))
            app.stop_pipeline()
+    
+    async def on_webcam_signalling_error(e):
+       if isinstance(e, WebRTCSignallingErrorNoPeer):
+           # Waiting for peer to connect, retry in 2 seconds.
+           time.sleep(2)
+           await webcam_signalling.setup_call()
+       else:
+           logger.error("webcam signalling error: %s", str(e))
+           webcam_app.stop_pipeline()
+
     signalling.on_error = on_signalling_error
+    webcam_signalling.on_error = on_webcam_signalling_error
 
     signalling.on_disconnect = lambda: app.stop_pipeline()
+    webcam_signalling.on_disconnect = lambda: webcam_app.stop_pipeline()
 
     # After connecting, attempt to setup call to peer.
     signalling.on_connect = signalling.setup_call
+    webcam_signalling.on_connect = webcam_signalling.setup_call
 
     # [START main_setup]
     # Fetch the TURN server and credentials
@@ -577,23 +597,41 @@ def main():
 
     # Create instance of app
     app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname)
+    webcam_app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname, True)
 
     # [END main_setup]
 
     # Send the local sdp to signalling when offer is generated.
     app.on_sdp = signalling.send_sdp
+    webcam_app.on_sdp = webcam_signalling.send_sdp
 
     # Send ICE candidates to the signalling server.
     app.on_ice = signalling.send_ice
+    webcam_app.on_ice = webcam_signalling.send_ice
 
     # Set the remote SDP when received from signalling server.
     signalling.on_sdp = app.set_sdp
+    webcam_signalling.on_sdp = webcam_app.set_sdp
 
     # Set ICE candidates received from signalling server.
     signalling.on_ice = app.set_ice
+    webcam_signalling.on_ice = webcam_app.set_ice
 
     # Start the pipeline once the session is established.
-    signalling.on_session = app.start_pipeline
+    # Start the pipeline once the session is established.
+    def on_session_handler(session_peer_id):
+        logger.info("starting session for peer id {}".format(session_peer_id))
+        if str(session_peer_id) == str(peer_id):
+            logger.info("starting video pipeline")
+            app.start_pipeline()
+        elif str(session_peer_id) == str(peer_webcam_id):
+            logger.info("starting webcam pipeline")
+            webcam_app.start_pipeline()
+        else:
+            logger.error("failed to start pipeline for peer_id: %s" % peer_id)
+
+    signalling.on_session = lambda peer_id: on_session_handler(peer_id)
+    webcam_signalling.on_session = lambda peer_id: on_session_handler(peer_id)
 
     # Initialize the Xinput instance
     webrtc_input = WebRTCInput(args.uinput_mouse_socket, args.uinput_js_socket, args.enable_clipboard.lower(), enable_cursors, cursor_size, cursor_debug)
@@ -666,6 +704,14 @@ def main():
         if enabled != curr_audio:
             app.send_reload_window()
     webrtc_input.on_set_enable_audio = lambda enabled: enable_audio_handler(enabled)
+
+    #### webcam enabled
+    def enable_webcam_handler(enabled):
+        if enabled:
+            logger.info("Enabled webcam")
+        else:
+            logger.info("Disabled webcam")
+    webrtc_input.on_set_enable_webcam = lambda enabled: enable_webcam_handler(enabled)
 
     # Handler for resize events.
     app.last_resize_success = True
@@ -832,7 +878,7 @@ def main():
     coturn_env_mon.on_rtc_config = mon_rtc_config
 
     try:
-        server.run()
+        asyncio.ensure_future(server.run(), loop=loop)
         metrics.start()
         loop.run_until_complete(webrtc_input.connect())
         loop.run_in_executor(None, lambda: webrtc_input.start_clipboard())
@@ -846,15 +892,27 @@ def main():
 
         while True:
             asyncio.ensure_future(app.handle_bus_calls(), loop=loop)
+            asyncio.ensure_future(webcam_app.handle_bus_calls(), loop=loop)
+
             loop.run_until_complete(signalling.connect())
+            loop.run_until_complete(webcam_signalling.connect())
+
+            asyncio.ensure_future(webcam_signalling.start(), loop=loop)
             loop.run_until_complete(signalling.start())
 
+            # if webrtc connection of video pipelined is failed/closed then close the webcam signalling 
+            # client socket connection from the signalling server. 
+            loop.run_until_complete(webcam_signalling.disconnect())
+
             app.stop_pipeline()
+            webcam_app.stop_pipeline()
     except Exception as e:
         logger.error("Caught exception: %s" % e)
         traceback.print_exc()
         sys.exit(1)
     finally:
+        app.stop_pipeline()
+        webcam_app.stop_pipeline()
         webrtc_input.stop_clipboard()
         webrtc_input.stop_cursor_monitor()
         webrtc_input.disconnect()
@@ -863,7 +921,7 @@ def main():
         rtc_file_mon.stop()
         system_mon.stop()
         coturn_env_mon.stop()
-        server.server.close()
+        loop.run_until_complete(server.stop())
         sys.exit(0)
     # [END main_start]
 

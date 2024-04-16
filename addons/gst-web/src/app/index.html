@@ -203,6 +203,13 @@
 
                  <v-btn color="primary" small v-on:click="shutdown()">Shutdown</v-btn>
 
+
+                 <p>
+                  <v-btn color="primary" v-if="!webcamEnabled" small v-on:click="webcamEnabled=true">Enable webcam</v-btn>
+                  <v-btn color="primary" v-else small v-on:click="webcamEnabled=false">Disable webcam</v-btn>
+                 </p>
+                 
+
                  <p>
                    Debugging
                    <v-switch v-model="debug" :label="`Debug logs: ${debug.toString()}`"></v-switch>

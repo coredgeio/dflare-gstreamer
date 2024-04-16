@@ -42,7 +42,7 @@ class GSTWebRTCAppError(Exception):
 
 
 class GSTWebRTCApp:
-    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None):
+    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None, webcam=False):
         """Initialize GStreamer WebRTC app.
 
         Initializes GObjects and checks for required plugins.
@@ -67,6 +67,8 @@ class GSTWebRTCApp:
         self.video_bitrate = video_bitrate
         self.audio_bitrate = audio_bitrate
         self.hostname = hostname
+
+        self.webcam = webcam
 
         # WebRTC ICE and SDP events
         self.on_ice = lambda mlineindex, candidate: logger.warn(
@@ -129,6 +131,8 @@ class GSTWebRTCApp:
         self.webrtcbin.connect('on-ice-candidate', lambda webrtcbin, mlineindex,
                                candidate: self.__send_ice(webrtcbin, mlineindex, candidate))
 
+        if self.webcam:
+            self.webrtcbin.connect('pad-added', self.handle_webcam_stream)
         # Add STUN server
         # TODO: figure out how to add more than 1 stun server.
         if self.stun_servers:
@@ -990,6 +994,29 @@ class GSTWebRTCApp:
         logger.debug("received ICE candidate: %d %s", mlineindex, candidate)
         loop = asyncio.new_event_loop()
         loop.run_until_complete(self.on_ice(mlineindex, candidate))
+    
+    def handle_webcam_stream(self, webrtcbin, pad):
+        pad_name = pad.get_name()
+        logger.info("Pad Name: " + str(pad_name))
+
+        if "sink" not in pad_name:
+            logger.info("It's a src pad")
+            caps = pad.get_current_caps()
+            logger.info("Pad caps: " + str(caps))
+
+            #fakesink = Gst.ElementFactory.make("fakesink", "fakesinkbroo")
+            rtph265depay = Gst.ElementFactory.make("rtph265depay", "rtph265depaybroo")
+            v4l2sink = Gst.ElementFactory.make("v4l2sink", "v4l2sinkbroo")
+            v4l2sink.set_property("device", "/dev/video9")
+
+            self.pipeline.add(rtph265depay)
+            self.pipeline.add(v4l2sink)
+
+            if not Gst.Element.link(self.webrtcbin, rtph265depay):
+                raise GSTWebRTCAppError("Failed to link webrtcbin -> rtph265depay")
+            
+            if not Gst.Element.link(rtph265depay, v4l2sink):
+                raise GSTWebRTCAppError("Failed to link rtph265depay -> v4l2sink")
 
     def start_pipeline(self):
         """Starts the GStreamer pipeline
@@ -998,13 +1025,17 @@ class GSTWebRTCApp:
         logger.info("starting pipeline")
 
         self.pipeline = Gst.Pipeline.new()
-
-        # Construct the webrtcbin pipeline with video and audio.
         self.build_webrtcbin_pipeline()
-        self.build_video_pipeline()
 
-        if self.audio:
-            self.build_audio_pipeline()
+        if self.webcam:
+            logger.info("For webcam creating a duplicate video pipeline for SD")
+            self.build_video_pipeline()
+        else:
+            # Construct the webrtcbin pipeline with video and audio.
+            self.build_video_pipeline()
+
+            if self.audio:
+                self.build_audio_pipeline()
 
         # Advance the state of the pipeline to PLAYING.
         res = self.pipeline.set_state(Gst.State.PLAYING)
@@ -1012,23 +1043,24 @@ class GSTWebRTCApp:
             raise GSTWebRTCAppError(
                 "Failed to transition pipeline to PLAYING: %s" % res)
 
-        # Create the data channel, this has to be done after the pipeline is PLAYING.
-        options = Gst.Structure("application/data-channel")
-        options.set_value("ordered", True)
-        options.set_value("max-retransmits", 0)
-        self.data_channel = self.webrtcbin.emit(
-            'create-data-channel', "input", options)
-        self.data_channel.connect('on-open', lambda _: self.on_data_open())
-        self.data_channel.connect('on-close', lambda _: self.on_data_close())
-        self.data_channel.connect('on-error', lambda _: self.on_data_error())
-        self.data_channel.connect(
-            'on-message-string', lambda _, msg: self.on_data_message(msg))
+        if not self.webcam:
+            # Create the data channel, this has to be done after the pipeline is PLAYING.
+            options = Gst.Structure("application/data-channel")
+            options.set_value("ordered", True)
+            options.set_value("max-retransmits", 0)
+            self.data_channel = self.webrtcbin.emit(
+                'create-data-channel', "input", options)
+            self.data_channel.connect('on-open', lambda _: self.on_data_open())
+            self.data_channel.connect('on-close', lambda _: self.on_data_close())
+            self.data_channel.connect('on-error', lambda _: self.on_data_error())
+            self.data_channel.connect(
+                'on-message-string', lambda _, msg: self.on_data_message(msg))
 
-        # Enable NACKs on the transceiver, helps with retransmissions and freezing when packets are dropped.
-        transceiver = self.webrtcbin.emit("get-transceiver", 0)
-        transceiver.set_property("do-nack", True)
+            # Enable NACKs on the transceiver, helps with retransmissions and freezing when packets are dropped.
+            transceiver = self.webrtcbin.emit("get-transceiver", 0)
+            transceiver.set_property("do-nack", True)
 
-        logger.info("pipeline started")
+        logger.info(f"pipeline started for {'video & audio' if not self.webcam else 'webcam'}")
     
     def bus_call(self, message):
         t = message.type
