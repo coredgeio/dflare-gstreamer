@@ -120,6 +120,9 @@ class GSTWebRTCApp:
         # See also: https://webrtcstandards.info/sdp-bundle/
         self.webrtcbin.set_property("bundle-policy", "max-compat")
 
+        # Set default jitterbuffer latency to the minimum possible
+        self.webrtcbin.set_property("latency", 1)
+
         # Connect signal handlers
         self.webrtcbin.connect(
             'on-negotiation-needed', lambda webrtcbin: self.__on_negotiation_needed(webrtcbin))
@@ -1046,11 +1049,9 @@ class GSTWebRTCApp:
                     return False
         elif t == Gst.MessageType.LATENCY:
             if self.pipeline:
-                try:
-                    self.pipeline.recalculate_latency()
-                except Exception as e:
-                    logger.warning("failed to recalculate warning, exception: %s" % str(e))
-
+                return_output = self.pipeline.recalculate_latency()
+                if not return_output:
+                    logger.warning("failed to recalculate pipeline latency")
         return True
 
     async def handle_bus_calls(self):
