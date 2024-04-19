@@ -24,7 +24,6 @@ from Xlib.ext import xfixes
 import base64
 import pynput
 import io
-import uinput
 import msgpack
 import re
 import os
@@ -38,31 +37,6 @@ import logging
 logger = logging.getLogger("webrtc_input")
 logger.setLevel(logging.INFO)
 
-JS_BTNS = (
-    uinput.BTN_GAMEPAD,
-    uinput.BTN_EAST,
-    uinput.BTN_NORTH,
-    uinput.BTN_WEST,
-    uinput.BTN_TL,
-    uinput.BTN_TR,
-    uinput.BTN_SELECT,
-    uinput.BTN_START,
-    uinput.BTN_THUMBL,
-    uinput.BTN_THUMBR,
-    uinput.BTN_MODE,
-)
-
-JS_AXES = (
-    uinput.ABS_X + (-32768, 32767, 0, 0),
-    uinput.ABS_Y + (-32768, 32767, 0, 0),
-    uinput.ABS_RX + (-32768, 32767, 0, 0),
-    uinput.ABS_RY + (-32768, 32767, 0, 0),
-    uinput.ABS_Z + (-32768, 32767, 0, 0),
-    uinput.ABS_RZ + (-32768, 32767, 0, 0),
-    uinput.ABS_HAT0X + (-1, 1, 0, 0),
-    uinput.ABS_HAT0Y + (-1, 1, 0, 0),
-)
-
 # Local enumerations for mouse actions.
 MOUSE_POSITION = 10
 MOUSE_MOVE = 11
@@ -75,18 +49,25 @@ MOUSE_BUTTON_LEFT = 41
 MOUSE_BUTTON_MIDDLE = 42
 MOUSE_BUTTON_RIGHT = 43
 
+UINPUT_BTN_LEFT = (0x01, 0x110)
+UINPUT_BTN_MIDDLE = (0x01, 0x112)
+UINPUT_BTN_RIGHT = (0x01, 0x111)
+UINPUT_REL_X = (0x02, 0x00)
+UINPUT_REL_Y = (0x02, 0x01)
+UINPUT_REL_WHEEL = (0x02, 0x08)
+
 # Local map for uinput and pynput buttons
 MOUSE_BUTTON_MAP = {
     MOUSE_BUTTON_LEFT: {
-        "uinput": uinput.BTN_LEFT,
+        "uinput": UINPUT_BTN_LEFT,
         "pynput": pynput.mouse.Button.left,
     },
     MOUSE_BUTTON_MIDDLE: {
-        "uinput": uinput.BTN_MIDDLE,
+        "uinput": UINPUT_BTN_MIDDLE,
         "pynput": pynput.mouse.Button.middle,
     },
     MOUSE_BUTTON_RIGHT: {
-        "uinput": uinput.BTN_RIGHT,
+        "uinput": UINPUT_BTN_RIGHT,
         "pynput": pynput.mouse.Button.right,
     },
 }
@@ -96,15 +77,12 @@ class WebRTCInputError(Exception):
 
 
 class WebRTCInput:
-    def __init__(self, uinput_mouse_socket_path="", uinput_js_socket_path="", enable_clipboard="", enable_cursors=True, cursor_size=24, cursor_debug=False):
+    def __init__(self, uinput_mouse_socket_path="", enable_clipboard="", enable_cursors=True, cursor_size=24, cursor_debug=False):
         """Initializes WebRTC input instance
         """
         self.clipboard_running = False
         self.uinput_mouse_socket_path = uinput_mouse_socket_path
         self.uinput_mouse_socket = None
-
-        self.uinput_js_socket_path = uinput_js_socket_path
-        self.uinput_js_socket = None
 
         self.enable_clipboard = enable_clipboard
 
@@ -117,7 +95,6 @@ class WebRTCInput:
 
         self.keyboard = None
         self.mouse = None
-        self.joystick = None
         self.xdisplay = None
         self.button_mask = 0
 
@@ -178,42 +155,6 @@ class WebRTCInput:
             data = msgpack.packb(cmd, use_bin_type=True)
             self.uinput_mouse_socket.sendto(data, self.uinput_mouse_socket_path)
 
-    def __js_connect(self, num_axes, num_buttons):
-        """Connect virtual joystick
-
-        Arguments:
-            num_axes {integer} -- number of joystick axes
-            num_buttons {integer} -- number of joystick buttons
-        """
-
-        if self.uinput_js_socket_path:
-            # Proxy uinput joystick commands through unix domain socket
-            logger.info("Connecting to uinput joystick socket: %s" % self.uinput_js_socket_path)
-            self.uinput_js_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        else:
-            logger.info("initializing joystick with %d buttons and %d axes" %
-                        (num_buttons, num_axes))
-            axes = JS_AXES[:min(len(JS_AXES), num_axes)]
-            btns = JS_BTNS[:min(len(JS_BTNS), num_buttons)]
-            self.joystick = uinput.Device(btns + axes,
-                                        vendor=0x045e,
-                                        product=0x028e,
-                                        version=0x110,
-                                        name="Microsoft X-Box 360 pad")
-
-    def __js_disconnect(self):
-        if self.joystick:
-            del self.joystick
-
-    def __js_emit(self, *args, **kwargs):
-        if self.uinput_js_socket_path:
-            cmd = {"args": args, "kwargs": kwargs}
-            data = msgpack.packb(cmd, use_bin_type=True)
-            self.uinput_js_socket.sendto(data, self.uinput_js_socket_path)
-        else:
-            if self.joystick is not None:
-                self.joystick.emit(*args, **kwargs)
-
     async def connect(self):
         """Connects to X server
 
@@ -273,20 +214,20 @@ class WebRTCInput:
             if self.uinput_mouse_socket_path:
                 # Send relative motion to uinput device.
                 # syn=False delays the sync until the second command.
-                self.__mouse_emit(uinput.REL_X, x, syn=False)
-                self.__mouse_emit(uinput.REL_Y, y)
+                self.__mouse_emit(UINPUT_REL_X, x, syn=False)
+                self.__mouse_emit(UINPUT_REL_Y, y)
             else:
                 self.mouse.move(x, y)
         elif action == MOUSE_SCROLL_UP:
             # Scroll up
             if self.uinput_mouse_socket_path:
-                self.__mouse_emit(uinput.REL_WHEEL, 1)
+                self.__mouse_emit(UINPUT_REL_WHEEL, 1)
             else:
                 self.mouse.scroll(0, -1)
         elif action == MOUSE_SCROLL_DOWN:
             # Scroll down
             if self.uinput_mouse_socket_path:
-                self.__mouse_emit(uinput.REL_WHEEL, -1)
+                self.__mouse_emit(UINPUT_REL_WHEEL, -1)
             else:
                 self.mouse.scroll(0, 1)
         elif action == MOUSE_BUTTON:
@@ -579,30 +520,6 @@ class WebRTCInput:
             bitrate = int(toks[1])
             logger.info("Setting audio bitrate to: %d" % bitrate)
             self.on_audio_encoder_bit_rate(bitrate)
-        elif toks[0] == "js":
-            # Joystick
-            # init: i,<type>,<num axes>,<num buttons>
-            # button: b,<btn_num>,<value>
-            # axis: a,<axis_num>,<value>
-            if toks[1] == 'c':
-                num_axes = int(toks[2])
-                num_btns = int(toks[3])
-                try:
-                    self.__js_connect(num_axes, num_btns)
-                except Exception as e:
-                    logger.error("Failed to initialize joystick: %s", e)
-            elif toks[1] == 'd':
-                self.__js_disconnect()
-            elif toks[1] == 'b':
-                btn_num = int(toks[2])
-                btn_on = toks[3] == '1'
-                self.__js_emit((uinput.BTN_0[0], btn_num), btn_on)
-            elif toks[1] == 'a':
-                axis_num = int(toks[2])
-                axis_val = int(toks[3])
-                self.__js_emit((uinput.ABS_X[0], axis_num), axis_val)
-            else:
-                logger.warning('unhandled joystick command: %s' % toks[1])
         elif toks[0] == "cr":
             # Clipboard read
             if self.enable_clipboard in ["true", "out"]:

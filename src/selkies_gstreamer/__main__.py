@@ -596,7 +596,7 @@ def main():
     signalling.on_session = app.start_pipeline
 
     # Initialize the Xinput instance
-    webrtc_input = WebRTCInput(args.uinput_mouse_socket, args.uinput_js_socket, args.enable_clipboard.lower(), enable_cursors, cursor_size, cursor_debug)
+    webrtc_input = WebRTCInput(args.uinput_mouse_socket, args.enable_clipboard.lower(), enable_cursors, cursor_size, cursor_debug)
 
     # Handle changed cursors
     webrtc_input.on_cursor_change = lambda data: app.send_cursor_data(data)
