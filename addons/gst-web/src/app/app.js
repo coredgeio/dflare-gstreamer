@@ -426,6 +426,7 @@ function runApp() {
 
   var webrtc = new WebRTCDemo(signalling, videoElement);
   var webcam_webrtc = new WebRTCDemo(webcam_signalling);
+  webcam_webrtc.webcam = true;
 
   // Function to add timestamp to logs.
   var applyTimestamp = (msg) => {

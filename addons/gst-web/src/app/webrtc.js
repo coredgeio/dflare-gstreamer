@@ -186,6 +186,7 @@ class WebRTCDemo {
          * @type {Object}
          */
         this._stream = null;
+        this.webcam = false
     }
 
     /**
@@ -281,16 +282,18 @@ class WebRTCDemo {
             this.peerConnection.createAnswer()
                 .then((local_sdp) => {
                     // Override SDP to enable stereo on WebRTC Opus with Chromium, must be munged before the Local Description
-                    if (local_sdp.sdp.indexOf('multiopus') === -1) {
-                        if (!(/[^-]stereo=1/gm.test(local_sdp.sdp))) {
-                            console.log("Overriding WebRTC SDP to allow stereo audio");
-                            if (/[^-]stereo=0/gm.test(local_sdp.sdp)) {
-                                local_sdp.sdp = local_sdp.sdp.replace('stereo=0', 'stereo=1');
-                            } else {
-                                local_sdp.sdp = local_sdp.sdp.replace('useinbandfec=', 'stereo=1;useinbandfec=');
+                    if (!this.webcam) {
+                        if (local_sdp.sdp.indexOf('multiopus') === -1) {
+                            if (!(/[^-]stereo=1/gm.test(local_sdp.sdp))) {
+                                console.log("Overriding WebRTC SDP to allow stereo audio");
+                                if (/[^-]stereo=0/gm.test(local_sdp.sdp)) {
+                                    local_sdp.sdp = local_sdp.sdp.replace('stereo=0', 'stereo=1');
+                                } else {
+                                    local_sdp.sdp = local_sdp.sdp.replace('useinbandfec=', 'stereo=1;useinbandfec=');
+                                }
                             }
                         }
-                    }
+                    } 
                     console.log("Created local SDP", local_sdp);
                     this.peerConnection.setLocalDescription(local_sdp).then(() => {
                         this._setDebug("Sending SDP answer");
@@ -680,12 +683,12 @@ class WebRTCDemo {
     async get_webcam_input() {
         this._stream = await navigator.mediaDevices.getUserMedia({
             video: true,
-            audio: false,
+            audio: true,
         });
 
-        console.log("Stream: ", this._stream);
-        console.log("Videos track:", this._stream.getTracks()[0])
-        this.peerConnection.addTrack(this._stream.getTracks()[0])
+        for (const track of this._stream.getTracks()) {
+            this.peerConnection.addTrack(track, this._stream);
+        }
     }
 
     connect_webcam() {

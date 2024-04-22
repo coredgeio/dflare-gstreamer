@@ -132,7 +132,8 @@ class GSTWebRTCApp:
                                candidate: self.__send_ice(webrtcbin, mlineindex, candidate))
 
         if self.webcam:
-            self.webrtcbin.connect('pad-added', self.handle_webcam_stream)
+            self.webrtcbin.connect('pad-added', self.on_incomig_webcam_stream)
+
         # Add STUN server
         # TODO: figure out how to add more than 1 stun server.
         if self.stun_servers:
@@ -994,29 +995,89 @@ class GSTWebRTCApp:
         logger.debug("received ICE candidate: %d %s", mlineindex, candidate)
         loop = asyncio.new_event_loop()
         loop.run_until_complete(self.on_ice(mlineindex, candidate))
+   
+    def handle_incoming_video_track(self, pad):
+        rtph264depay = Gst.ElementFactory.make("rtph264depay", "rtph264depay")
+
+        caps = Gst.caps_from_string("application/x-rtp")
+        caps.set_value("media", "video")
+        caps.set_value("encoding-name", "H264")
+        caps.set_value("payload", 123)
+        caps.set_value("clock-rate", 90000)
+        caps_fileter = Gst.ElementFactory.make("capsfilter", "capsfilter")
+        caps_fileter.set_property("caps", caps)
+
+        avdec_h264 = Gst.ElementFactory.make("avdec_h264", "avdec_h264")
+
+        videoconvert = Gst.ElementFactory.make("videoconvert", "videoconvert")
+        
+        v4l2sink = Gst.ElementFactory.make("v4l2sink", "v4l2sink")
+        v4l2sink.set_property("device", "/dev/video9")
+        
+        self.pipeline.add(rtph264depay, v4l2sink, avdec_h264, videoconvert)
+
+        rtph264depay.sync_state_with_parent()
+        v4l2sink.sync_state_with_parent()
+        avdec_h264.sync_state_with_parent()
+        videoconvert.sync_state_with_parent()
+
+        pad.link(rtph264depay.get_static_pad('sink'))
+        rtph264depay.link(avdec_h264)
+        avdec_h264.link(videoconvert)
+        videoconvert.link(v4l2sink)
+
+    def handle_incoming_audio_track(self, pad):
+        rtpopusdepay = Gst.ElementFactory.make("rtpopusdepay", "rtpopusdepay")
+        opusdec = Gst.ElementFactory.make("opusdec", "opusdec")
+        audioconvert = Gst.ElementFactory.make("audioconvert", "audioconvert")
+        audioresample = Gst.ElementFactory.make("audioresample", "audioresample")
+        pulsesink = Gst.ElementFactory.make("pulsesink", "pulsesink")
+        pulsesink.set_property("device", "virtmic")
+
+        self.pipeline.add(rtpopusdepay, opusdec, audioconvert, audioresample, pulsesink)
+        rtpopusdepay.sync_state_with_parent()
+        opusdec.sync_state_with_parent()
+        audioconvert.sync_state_with_parent()
+        audioresample.sync_state_with_parent()
+        pulsesink.sync_state_with_parent()
+
+        pad.link(rtpopusdepay.get_static_pad('sink'))
+        rtpopusdepay.link(opusdec)
+        opusdec.link(audioconvert)
+        audioconvert.link(audioresample)
+        audioresample.link(pulsesink)
+
+    def on_incomig_webcam_stream(self, _, pad):
+        if pad.direction != Gst.PadDirection.SRC:
+            logger.error("Incoming stream pad is not SRC pad")
+            return
+        
+        caps = pad.get_current_caps().to_string()
+        if "video" in caps:
+            self.handle_incoming_video_track(pad)
+        elif "audio" in caps:
+            self.handle_incoming_audio_track(pad)
     
-    def handle_webcam_stream(self, webrtcbin, pad):
-        pad_name = pad.get_name()
-        logger.info("Pad Name: " + str(pad_name))
+    def setup_transceivers(self):
+        # Video Transceiver
+        codec_caps = Gst.caps_from_string("application/x-rtp")
+        codec_caps.set_value("media", "video")
+        codec_caps.set_value("encoding-name", "H264")
+        codec_caps.set_value("payload", 106)
+        codec_caps.set_value("clock-rate", 90000)
+        codec_caps.set_value("packetization-mode", '1')
+        
+        self.webrtcbin.emit('add-transceiver', GstWebRTC.WebRTCRTPTransceiverDirection.RECVONLY, codec_caps)
 
-        if "sink" not in pad_name:
-            logger.info("It's a src pad")
-            caps = pad.get_current_caps()
-            logger.info("Pad caps: " + str(caps))
-
-            #fakesink = Gst.ElementFactory.make("fakesink", "fakesinkbroo")
-            rtph265depay = Gst.ElementFactory.make("rtph265depay", "rtph265depaybroo")
-            v4l2sink = Gst.ElementFactory.make("v4l2sink", "v4l2sinkbroo")
-            v4l2sink.set_property("device", "/dev/video9")
-
-            self.pipeline.add(rtph265depay)
-            self.pipeline.add(v4l2sink)
-
-            if not Gst.Element.link(self.webrtcbin, rtph265depay):
-                raise GSTWebRTCAppError("Failed to link webrtcbin -> rtph265depay")
-            
-            if not Gst.Element.link(rtph265depay, v4l2sink):
-                raise GSTWebRTCAppError("Failed to link rtph265depay -> v4l2sink")
+        # Audio transceiver
+        codec_caps_audio = Gst.caps_from_string("application/x-rtp")
+        codec_caps_audio.set_value("media", "audio")
+        codec_caps_audio.set_value("encoding-name", "OPUS")
+        codec_caps_audio.set_value("payload", 111)
+        codec_caps_audio.set_value("clock-rate", 48000)
+        codec_caps_audio.set_value("stereo", "0")
+        codec_caps_audio.set_value("encoding-params", "2")
+        self.webrtcbin.emit("add-transceiver", GstWebRTC.WebRTCRTPTransceiverDirection.RECVONLY, codec_caps_audio)
 
     def start_pipeline(self):
         """Starts the GStreamer pipeline
@@ -1028,8 +1089,8 @@ class GSTWebRTCApp:
         self.build_webrtcbin_pipeline()
 
         if self.webcam:
-            logger.info("For webcam creating a duplicate video pipeline for SD")
-            self.build_video_pipeline()
+            logger.info("Setting up transceivers for the webcam webrtc connection")
+            self.setup_transceivers()
         else:
             # Construct the webrtcbin pipeline with video and audio.
             self.build_video_pipeline()
@@ -1059,6 +1120,14 @@ class GSTWebRTCApp:
             # Enable NACKs on the transceiver, helps with retransmissions and freezing when packets are dropped.
             transceiver = self.webrtcbin.emit("get-transceiver", 0)
             transceiver.set_property("do-nack", True)
+
+        if self.webcam:
+            # Enable FEC for webcam transceivers
+            transceiver0 = self.webrtcbin.emit("get-transceiver", 0)
+            transceiver0.set_property("fec-type", GstWebRTC.WebRTCFECType.ULP_RED)
+
+            transceiver1 = self.webrtcbin.emit("get-transceiver", 1)
+            transceiver1.set_property("fec-type", GstWebRTC.WebRTCFECType.ULP_RED)
 
         logger.info(f"pipeline started for {'video & audio' if not self.webcam else 'webcam'}")
     
