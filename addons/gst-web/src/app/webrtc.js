@@ -186,6 +186,10 @@ class WebRTCDemo {
          * @type {Object}
          */
         this._stream = null;
+
+        /**
+         * @type {Boolean}
+         */
         this.webcam = false
     }
 
@@ -680,30 +684,35 @@ class WebRTCDemo {
         this.signalling.connect();
     }
 
-    async get_webcam_input() {
-        var isError = false
+    /**
+     * Retrieves the media devices to capture webcam data
+     */
+    async getMediaDevices() {
+        var errorOccured = false
         try {
             this._stream = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true,
             });
         } catch(error) {
-            console.log("Error obj: ", error)
-            isError = true
+            errorOccured = true
             if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-                console.log("User denied permission: ", error)
+                console.log("Failed to get permission: ", error.message)
             } else {
                 console.error('Error accessing media devices', error);
             }
         }
-        if (isError){
+        if (errorOccured){
             return false;
         }
         return true;
     }
 
-    async connect_webcam() {
-        var consentReceived = await this.get_webcam_input() 
+    /**
+     * Initiates the connection to stream webcam data
+     */
+    async connectWebcam() {
+        var consentReceived = await this.getMediaDevices() 
         if (!consentReceived) {
             console.log("User media unavailable")
             return false
@@ -715,11 +724,13 @@ class WebRTCDemo {
         this.peerConnection.onicecandidate = this._onPeerICE.bind(this);
         this.peerConnection.ondatachannel = this._onPeerdDataChannel.bind(this);
 
-        // Add the webcam tracks to peerConnection object
-        for (const track of this._stream.getTracks()) {
-            this.peerConnection.addTrack(track, this._stream);
+         // Add the webcam tracks to peerConnection object
+        if (this._stream) {
+            for (const track of this._stream.getTracks()) {
+                this.peerConnection.addTrack(track, this._stream);
+            }
         }
-
+       
         this.peerConnection.onconnectionstatechange = () => {
             // Local event handling.
             this._handleConnectionStateChange(this.peerConnection.connectionState);
@@ -737,7 +748,23 @@ class WebRTCDemo {
         this.signalling.connect();
     }
 
+    /**
+     * Handles closing of webcam peer connection
+     */
+    closePeerConnection(){
+        this.signalling.disconnect();
 
+        // Close the connection which in turn handles releasing of all resources 
+        // of webrtc, ice, rtp senders, etc
+        if (this.peerConnection)
+            this.peerConnection.close();
+
+        // Release the user media streams
+        if (this._stream) {
+            this._stream.getTracks().forEach(track => track.stop());
+        }
+        this._setStatus("Connection closed intentionally")
+    }
 
     /**
      * Attempts to reset the webrtc connection by:

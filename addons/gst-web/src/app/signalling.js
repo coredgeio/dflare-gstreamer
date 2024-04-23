@@ -295,7 +295,8 @@ class WebRTCDemoSignalling {
      * Triggers onServerClose event.
      */
     disconnect() {
-        this._ws_conn.close();
+        if (this._ws_conn)
+            this._ws_conn.close();
     }
 
     /**

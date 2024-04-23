@@ -333,9 +333,12 @@ function runApp() {
         if (oldValue !== null && newValue !== oldValue && newValue === false) {
           webrtc.sendDataChannelMessage("_arg_webcam," + newValue);
           this.setBoolParam("webcamEnabled", newValue);
+
+          // handle disconnection of webrtc connection of webcam
+          webcam_webrtc.closePeerConnection();
         }
         if (newValue === true){
-          var receivedConsent = webcam_webrtc.connect_webcam();
+          var receivedConsent = webcam_webrtc.connectWebcam();
           receivedConsent.then(consent => {
             if (consent === false) {
               this.webcamEnabled=false;

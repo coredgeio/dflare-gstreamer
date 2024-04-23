@@ -879,6 +879,39 @@ def main():
         turn_protocol, using_turn_tls)
     coturn_env_mon.on_rtc_config = mon_rtc_config
 
+    async def desktop_pipeline():
+        asyncio.ensure_future(app.handle_bus_calls(), loop=loop)
+        await signalling.connect()
+        task = asyncio.create_task(signalling.start())
+        return task
+
+    async def webcam_pipeline():
+        asyncio.ensure_future(webcam_app.handle_bus_calls(), loop=loop)
+        await webcam_signalling.connect()
+
+        task = asyncio.create_task(webcam_signalling.start())
+        return task
+    
+    async def run_the_loop():
+        desktop_task = await desktop_pipeline()
+        webcam_task = await webcam_pipeline()
+
+        # TODO: done() method only returns boolean value, even for exceptions, 
+        # need to handle exceptions if we encounter any
+        while True:
+
+            # If the task is finished for any reason(completed, or exception raised) reinstantiate them again.
+            # This is done to facilitate the session(especially for webcam connection) to server multiple number
+            # of times, as, a user can enable/disable the webcam 'n' number of times in a single session of desktop streaming.
+            if desktop_task.done():
+                app.stop_pipeline()
+                desktop_task = await desktop_pipeline()
+            
+            if webcam_task.done():
+                webcam_app.stop_pipeline()
+                webcam_task = await webcam_pipeline()
+            await asyncio.sleep(0.5)
+
     try:
         asyncio.ensure_future(server.run(), loop=loop)
         metrics.start()
@@ -892,22 +925,8 @@ def main():
         loop.run_in_executor(None, lambda: system_mon.start())
         loop.run_in_executor(None, lambda: coturn_env_mon.start())
 
-        while True:
-            asyncio.ensure_future(app.handle_bus_calls(), loop=loop)
-            asyncio.ensure_future(webcam_app.handle_bus_calls(), loop=loop)
-
-            loop.run_until_complete(signalling.connect())
-            loop.run_until_complete(webcam_signalling.connect())
-
-            asyncio.ensure_future(webcam_signalling.start(), loop=loop)
-            loop.run_until_complete(signalling.start())
-
-            # if webrtc connection of video pipelined is failed/closed then close the webcam signalling 
-            # client socket connection from the signalling server. 
-            loop.run_until_complete(webcam_signalling.disconnect())
-
-            app.stop_pipeline()
-            webcam_app.stop_pipeline()
+        loop.run_until_complete(run_the_loop())
+            
     except Exception as e:
         logger.error("Caught exception: %s" % e)
         traceback.print_exc()
