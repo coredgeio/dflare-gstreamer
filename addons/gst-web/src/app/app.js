@@ -20,60 +20,11 @@
  *   limitations under the License.
  */
 
-import Keycloak from './keycloak.js';
 import WebRTCDemoSignalling from './signalling.js';
 import WebRTCDemo from './webrtc.js';
 import "./css/style.css"
 import "./css/vuetify.css"
 import "./manifest.json";
-
-// const initOptions = {
-//   url: "https://sso.dflare.io/auth",
-//   realm: "dflare",
-//   clientId: "app",
-//   onLoad: "login-required",
-// };
-
-// const _keycloak = Keycloak(initOptions);
-
-// // createInstance()
-
-// _keycloak
-//   .init({ onLoad: "login-required", checkLoginIframe: false })
-//   .then((res) => {
-//     // if (res) {
-//     runApp();
-
-//     let tokenRefreshInterval = setInterval(() => {
-//       _keycloak
-//         .updateToken(5)
-//         .then((refreshed) => {
-//           if (refreshed) {
-//             console.log("Token refreshed");
-//           } else {
-//             console.log("Token not refreshed, or the user is not logged in.");
-//           }
-//         })
-//         .catch((error) => {
-//           console.error("Error refreshing token", error);
-//         });
-//     }, 60000);
-
-//     // Clear the interval and logout when the window is closed
-//     const clearToken = () => {
-//       clearInterval(tokenRefreshInterval);
-//       _keycloak.logout();
-//     };
-
-//     window.addEventListener("beforeunload", clearToken);
-//     window.addEventListener("unload", clearToken);
-//     // } else {
-//     //   console.error("Keycloak initialization failed");
-//     // }
-//   })
-//   .catch((error) => {
-//     console.error("Error initializing Keycloak", error);
-//   });
 
 runApp();
 
