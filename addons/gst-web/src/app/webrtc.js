@@ -681,24 +681,44 @@ class WebRTCDemo {
     }
 
     async get_webcam_input() {
-        this._stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-        });
-
-        for (const track of this._stream.getTracks()) {
-            this.peerConnection.addTrack(track, this._stream);
+        var isError = false
+        try {
+            this._stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+            });
+        } catch(error) {
+            console.log("Error obj: ", error)
+            isError = true
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                console.log("User denied permission: ", error)
+            } else {
+                console.error('Error accessing media devices', error);
+            }
         }
+        if (isError){
+            return false;
+        }
+        return true;
     }
 
-    connect_webcam() {
+    async connect_webcam() {
+        var consentReceived = await this.get_webcam_input() 
+        if (!consentReceived) {
+            console.log("User media unavailable")
+            return false
+        }
+
         // Create the peer connection object and bind callbacks.
         this.peerConnection = new RTCPeerConnection(this.rtcPeerConfig);
         this.peerConnection.ontrack = this._ontrack.bind(this);
         this.peerConnection.onicecandidate = this._onPeerICE.bind(this);
         this.peerConnection.ondatachannel = this._onPeerdDataChannel.bind(this);
 
-        this.get_webcam_input();
+        // Add the webcam tracks to peerConnection object
+        for (const track of this._stream.getTracks()) {
+            this.peerConnection.addTrack(track, this._stream);
+        }
 
         this.peerConnection.onconnectionstatechange = () => {
             // Local event handling.

@@ -330,11 +330,22 @@ function runApp() {
       webcamEnabled(newValue, oldValue) {
         if (newValue === null) return;
         console.log("webcam enabled changed from " + oldValue + " to " + newValue);
-        if (oldValue !== null && newValue !== oldValue)
+        if (oldValue !== null && newValue !== oldValue && newValue === false) {
           webrtc.sendDataChannelMessage("_arg_webcam," + newValue);
-        this.setBoolParam("webcamEnabled", newValue);
-
-        webcam_webrtc.connect_webcam();
+          this.setBoolParam("webcamEnabled", newValue);
+        }
+        if (newValue === true){
+          var receivedConsent = webcam_webrtc.connect_webcam();
+          receivedConsent.then(consent => {
+            if (consent === false) {
+              this.webcamEnabled=false;
+            } else {
+              // Got user consent for media devices and peerConnection is setup from client side
+              webrtc.sendDataChannelMessage("_arg_webcam," + newValue);
+              this.setBoolParam("webcamEnabled", newValue);
+            }
+          })
+        }
       },
       resizeRemote(newValue, oldValue) {
         if (newValue === null) return;

@@ -705,12 +705,14 @@ def main():
             app.send_reload_window()
     webrtc_input.on_set_enable_audio = lambda enabled: enable_audio_handler(enabled)
 
-    #### webcam enabled
+    # Handle webcam pipeline
     def enable_webcam_handler(enabled):
         if enabled:
-            logger.info("Enabled webcam")
+            # Webcam pipeline initialisation is handled by on_session handler of websocket connection
+            logger.info("Webcam enabled")
         else:
-            logger.info("Disabled webcam")
+            webcam_app.stop_pipeline()
+            logger.info("Webcam disabled")
     webrtc_input.on_set_enable_webcam = lambda enabled: enable_webcam_handler(enabled)
 
     # Handler for resize events.
