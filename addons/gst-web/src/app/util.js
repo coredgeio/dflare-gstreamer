@@ -1,15 +1,22 @@
 export default class Queue{
-    constructor(...items){
+    /**
+     * @constructor
+     * @param {Array}
+     */
+    constructor(...elements){
+      /**
+      * @type {Array}
+      */
       this.items = [];
-      this.enqueue(...items);
+      this.enqueue(...elements);
     }
    
-    enqueue(...items){
-      items.forEach(item => this.items.push(item));
+    enqueue(...elements){
+      elements.forEach(element => this.items.push(element));
     }
    
-    dequeue(count=1){
-      return this.items.splice(0, count)[0];
+    dequeue(){
+      return this.items.shift();
     }
    
     size(){
