@@ -130,6 +130,9 @@ class Input {
         this._smallestDeltaY = 10000;
         this._wheelThreshold = 100;
         this._scrollMagnitude = 10;
+
+        // keys pressed list to send key repeat events to server
+        this.keyRepeatQueue = new Queue();
     }
 
     /**
@@ -573,12 +576,32 @@ class Input {
         this.keyboard = new Guacamole.Keyboard(window);
         this.keyboard.onkeydown = (keysym) => {
             this.send("kd," + keysym);
+            if (!this.keyRepeatQueue.find(keysym)) {
+                this.keyRepeatQueue.enqueue(keysym);
+            }
         };
         this.keyboard.onkeyup = (keysym) => {
             this.send("ku," + keysym);
+            this.keyRepeatQueue.remove(keysym);
         };
 
         this._windowMath();
+
+        this.keyRepeatRunning = true; 
+        this._handleKeyRepeatEvents();
+    }
+
+    // A handler function to send key-repeat events for keys that are pressed and kept hold
+    async _handleKeyRepeatEvents(){
+        while (this.keyRepeatRunning) {
+            var keysyms = this.keyRepeatQueue.toArray();
+
+            for(var keysym of keysyms){
+                this.send("kt," + keysym);
+            }
+
+            await this.sleep(2000);
+        }
     }
 
     detach() {
@@ -591,6 +614,10 @@ class Input {
             delete this.keyboard;
             this.send("kr");
         }
+
+        // Reset the key-repeat handler
+        this.keyRepeatQueue.clear();
+        this.keyRepeatRunning = false;
     }
 
     /**
@@ -624,6 +651,14 @@ class Input {
             parseInt((document.body.offsetWidth - document.body.offsetWidth%2) * window.devicePixelRatio),
             parseInt((document.body.offsetHeight - document.body.offsetHeight%2) * window.devicePixelRatio)
         ];
+    }
+
+    async sleep(milliseconds) {
+        await new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve();
+            }, milliseconds);
+        });
     }
 }
 

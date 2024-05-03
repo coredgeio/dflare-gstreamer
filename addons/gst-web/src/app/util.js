@@ -26,4 +26,21 @@ export default class Queue{
     isEmpty(){
       return this.items.length===0;
     }
+
+    toArray() {
+      return [...this.items]
+    }
+
+    remove(element) {
+        var index = this.items.indexOf(element)
+        this.items.splice(index, 1)
+    }
+
+    find(element) {
+        return this.items.indexOf(element) == -1 ? false: true;
+    }
+
+    clear(){
+        this.items.length = 0;
+    }
 }
