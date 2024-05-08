@@ -42,7 +42,7 @@ class GSTWebRTCAppError(Exception):
 
 
 class GSTWebRTCApp:
-    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None, webcam=False):
+    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None, webcam=False, video_device="/dev/video0"):
         """Initialize GStreamer WebRTC app.
 
         Initializes GObjects and checks for required plugins.
@@ -69,6 +69,7 @@ class GSTWebRTCApp:
         self.hostname = hostname
 
         self.webcam = webcam
+        self.video_device = video_device
 
         # WebRTC ICE and SDP events
         self.on_ice = lambda mlineindex, candidate: logger.warn(
@@ -900,7 +901,16 @@ class GSTWebRTCApp:
 
         self.__send_data_channel_message(
             "system", {"action": "hostname,"+str(hostname)})
+        
+    def send_webcam_enabled(self, webcam_enabled):
+        """Sends the webcam enabled status
+        """
 
+        logger.info("Sending webcam enabled: " + str(webcam_enabled))
+        self.__send_data_channel_message(
+            "system", {"action": "webcam,"+str(webcam_enabled)}
+        )
+        
     def is_data_channel_ready(self):
         """Checks to see if the data channel is open.
 
@@ -1012,7 +1022,7 @@ class GSTWebRTCApp:
         videoconvert = Gst.ElementFactory.make("videoconvert", "videoconvert")
         
         v4l2sink = Gst.ElementFactory.make("v4l2sink", "v4l2sink")
-        v4l2sink.set_property("device", "/dev/video9")
+        v4l2sink.set_property("device", self.video_device)
         
         self.pipeline.add(rtph264depay, v4l2sink, avdec_h264, videoconvert)
 

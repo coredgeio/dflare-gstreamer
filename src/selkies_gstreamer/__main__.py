@@ -459,6 +459,12 @@ def main():
     parser.add_argument('--hostname',
                         default=os.environ.get('HOSTNAME', ''),
                         help='Hostname of the system')
+    parser.add_argument('--enable_webcam',
+                        default=os.environ.get('WEBRTC_ENABLE_WEBCAM', 'false'),
+                        help='Enable webcam feature')
+    parser.add_argument('--video_device',
+                        default=os.environ.get("WEBRTC_VIDEO_DEVICE", "/dev/video0"),
+                        help='Virtual video device to stream the webcam video media to')
     args = parser.parse_args()
 
     if os.path.exists(args.json_config):
@@ -594,10 +600,11 @@ def main():
     cursor_debug = args.debug_cursors.lower() == "true"
     cursor_size = int(args.cursor_size)
     hostname = args.hostname
+    enable_webcam = args.enable_webcam.lower() == "true"
 
     # Create instance of app
     app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname)
-    webcam_app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname, True)
+    webcam_app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname, enable_webcam)
 
     # [END main_setup]
 
@@ -652,6 +659,7 @@ def main():
         app.send_encoder(app.encoder)
         app.send_cursor_data(app.last_cursor_sent)
         app.send_hostname(app.hostname)
+        app.send_webcam_enabled(webcam_app.webcam)
 
     app.on_data_open = lambda: data_channel_ready()
 
@@ -894,7 +902,9 @@ def main():
     
     async def run_the_loop():
         desktop_task = await desktop_pipeline()
-        webcam_task = await webcam_pipeline()
+
+        if enable_webcam:
+            webcam_task = await webcam_pipeline()
 
         # TODO: done() method only returns boolean value, even for exceptions, 
         # need to handle exceptions if we encounter any
@@ -906,10 +916,11 @@ def main():
             if desktop_task.done():
                 app.stop_pipeline()
                 desktop_task = await desktop_pipeline()
-            
-            if webcam_task.done():
-                webcam_app.stop_pipeline()
-                webcam_task = await webcam_pipeline()
+
+            if enable_webcam:
+                if webcam_task.done():
+                    webcam_app.stop_pipeline()
+                    webcam_task = await webcam_pipeline()
             await asyncio.sleep(0.5)
 
     try:
@@ -933,7 +944,9 @@ def main():
         sys.exit(1)
     finally:
         app.stop_pipeline()
-        webcam_app.stop_pipeline()
+        if enable_webcam:
+            webcam_app.stop_pipeline()
+            
         webrtc_input.stop_clipboard()
         webrtc_input.stop_cursor_monitor()
         webrtc_input.disconnect()

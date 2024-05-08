@@ -79,6 +79,7 @@ function runApp() {
         ],
         audioEnabled: true,
         webcamEnabled: false,
+        webcamStatus: false,
         audioBitRate: 32000,
         audioBitRateOptions: [
           { text: "32 kb/s", value: 32000 },
@@ -734,6 +735,8 @@ function runApp() {
       }
     } else if (action.startsWith("hostname")){
         app.workspaceName = action.split(",")[1]
+    } else if (action.startsWith("webcam")) {
+        app.webcamStatus = action.split(",")[1].toLowerCase() === "true";
     } else {
       webrtc._setStatus("Unhandled system action: " + action);
     }
