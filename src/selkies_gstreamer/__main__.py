@@ -851,6 +851,7 @@ def main():
             loop.run_until_complete(signalling.start())
 
             app.stop_pipeline()
+            webrtc_input.release_keys()
     except Exception as e:
         logger.error("Caught exception: %s" % e)
         traceback.print_exc()
