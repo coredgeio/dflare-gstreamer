@@ -843,6 +843,7 @@ def main():
         loop.run_in_executor(None, lambda: rtc_file_mon.start())
         loop.run_in_executor(None, lambda: system_mon.start())
         loop.run_in_executor(None, lambda: coturn_env_mon.start())
+        loop.run_in_executor(None, lambda: webrtc_input.handle_key_repeat())
 
         while True:
             asyncio.ensure_future(app.handle_bus_calls(), loop=loop)
@@ -850,6 +851,7 @@ def main():
             loop.run_until_complete(signalling.start())
 
             app.stop_pipeline()
+            webrtc_input.release_keys()
     except Exception as e:
         logger.error("Caught exception: %s" % e)
         traceback.print_exc()

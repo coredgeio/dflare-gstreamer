@@ -25,7 +25,7 @@
 
 import GamepadManager from "./gamepad.js";
 import Guacamole from "../app/lib/guacamole-keyboard-selkies.js";
-import Queue from "./util.js";
+import { Queue, LinkedList } from "./utils.js";
 
 class Input {
     /**
@@ -130,6 +130,9 @@ class Input {
         this._smallestDeltaY = 10000;
         this._wheelThreshold = 100;
         this._scrollMagnitude = 10;
+
+        // keys pressed list to send key repeat events to server
+        this.keyRepeatList = new LinkedList();
     }
 
     /**
@@ -573,12 +576,33 @@ class Input {
         this.keyboard = new Guacamole.Keyboard(window);
         this.keyboard.onkeydown = (keysym) => {
             this.send("kd," + keysym);
+            if (!this.keyRepeatList.find(keysym)) {
+                this.keyRepeatList.insert(keysym);
+            }
         };
         this.keyboard.onkeyup = (keysym) => {
             this.send("ku," + keysym);
+            this.keyRepeatList.remove(keysym);
         };
 
         this._windowMath();
+
+        this.keyRepeatRunning = true; 
+        this._handleKeyRepeatEvents();
+    }
+
+    // A handler function to send key-repeat events for keys that are pressed and kept hold
+    async _handleKeyRepeatEvents(){
+        while (this.keyRepeatRunning) {
+            var current = this.keyRepeatList.head;
+            while (current) {
+                var keysym = current.data
+                this.send("kt," + keysym);
+                current = current.next;
+            }
+
+            await this.sleep(200);
+        }
     }
 
     detach() {
@@ -591,6 +615,10 @@ class Input {
             delete this.keyboard;
             this.send("kr");
         }
+
+        // Reset the key-repeat handler
+        this.keyRepeatRunning = false;
+        this.keyRepeatList.clear();
     }
 
     /**
@@ -624,6 +652,14 @@ class Input {
             parseInt((document.body.offsetWidth - document.body.offsetWidth%2) * window.devicePixelRatio),
             parseInt((document.body.offsetHeight - document.body.offsetHeight%2) * window.devicePixelRatio)
         ];
+    }
+
+    async sleep(milliseconds) {
+        await new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve();
+            }, milliseconds);
+        });
     }
 }
 
