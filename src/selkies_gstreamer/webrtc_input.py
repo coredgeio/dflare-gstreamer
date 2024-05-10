@@ -32,6 +32,7 @@ from subprocess import Popen, PIPE, STDOUT
 import socket
 import time
 from PIL import Image
+from utils import LinkedList
 
 import logging
 logger = logging.getLogger("webrtc_input")
@@ -99,6 +100,9 @@ class WebRTCInput:
         self.button_mask = 0
 
         self.ping_start = None
+
+        # Stores key-repeat keys with arrival time
+        self.key_repeat_keys = LinkedList()
 
         self.on_video_encoder_bit_rate = lambda bitrate: logger.warn(
             'unhandled on_video_encoder_bit_rate')
@@ -250,7 +254,7 @@ class WebRTCInput:
                 else:
                     self.mouse.release(btn)
 
-    def send_x11_keypress(self, keysym, down=True):
+    def send_x11_keypress(self, keysym, down=True, key_repeat=False):
         """Sends keypress to X server
 
         The key sym is converted to a keycode using the X server library.
@@ -260,6 +264,7 @@ class WebRTCInput:
 
         Keyword Arguments:
             down {bool} -- toggle key down or up (default: {True})
+            key_repeat {bool} -- to indicate key-repeat event (default: {True})
         """
 
         # With the Generic 105-key PC layout (default in Linux without a real keyboard), the key '<' is redirected to keycode 94
@@ -267,11 +272,55 @@ class WebRTCInput:
         # Although prevented in most cases, this fix may present issues in some keyboard layouts
         if keysym == 60 and self.keyboard._display.keysym_to_keycode(keysym) == 94:
             keysym = 44
+
+        if key_repeat:
+            # Set or update the timestamp of the key
+            if self.key_repeat_keys.find(keysym) is None:
+                self.key_repeat_keys.insert(keysym, time.monotonic())
+            else:
+                self.key_repeat_keys.remove(keysym)
+                self.key_repeat_keys.insert(keysym, time.monotonic())
+            return
+        
         keycode = pynput.keyboard.KeyCode(keysym)
         if down:
             self.keyboard.press(keycode)
         else:
             self.keyboard.release(keycode)
+
+            if self.key_repeat_keys.find(keysym):
+                self.key_repeat_keys.remove(keysym)
+
+    def handle_key_repeat(self):
+        """Handles key-repeat event keys by monitoring the pressed keys from the
+           dictionary object and releases those based on the elapsed time
+        """
+        while True:
+            now = time.monotonic()
+
+            current = self.key_repeat_keys.head
+            while current:
+                key = current.data
+                timeout = current.timestamp
+                elapsed_time = now - timeout
+
+                # Release the key if elapsed time is over 1.0s
+                if elapsed_time >= 1.0:
+                    self.send_x11_keypress(key, down=False)
+
+                current = current.next
+            time.sleep(0.1)
+
+    def release_keys(self):
+        """Release all keys stored in list upon session disconnection
+        """
+        current = self.key_repeat_keys.head
+        while current:
+            key = current.data
+            self.send_x11_keypress(key, down=False)
+            current = current.next
+        self.key_repeat_keys.clear()
+        logger.info("all keystrokes released after session disconnection")
 
     def send_x11_mouse(self, x, y, button_mask, scroll_magnitude, relative=False):
         """Sends mouse events to the X server.
@@ -495,6 +544,9 @@ class WebRTCInput:
         elif toks[0] == "kr":
             # Keyboard reset
             self.reset_keyboard()
+        elif toks[0] == "kt":
+            # key-repeat events for a key
+            self.send_x11_keypress(int(toks[1]), down=False, key_repeat=True)
         elif toks[0] in ["m", "m2"]:
             # Mouse action
             # x,y,button_mask

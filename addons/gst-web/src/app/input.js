@@ -25,7 +25,7 @@
 
 import GamepadManager from "./gamepad.js";
 import Guacamole from "../app/lib/guacamole-keyboard-selkies.js";
-import Queue from "./util.js";
+import { Queue, LinkedList } from "./utils.js";
 
 class Input {
     /**
@@ -113,7 +113,7 @@ class Input {
          * @type {function}
          */
         this.onresizeend = null;
-
+       
         /**
          * @type {Object}
          */
@@ -124,12 +124,15 @@ class Input {
         this._rtimeout = false;
         this._rdelta = 500;
 
-        // variables used by mousewhell function.
+        // mouse and trackpad variables to adjust the scrolling based on pointer device
         this._allowTrackpadScrolling = true;
         this._allowThreshold = true;
         this._smallestDeltaY = 10000;
-        this._wheelThreshold = 100
+        this._wheelThreshold = 100;
         this._scrollMagnitude = 10;
+
+        // keys pressed list to send key repeat events to server
+        this.keyRepeatList = new LinkedList();
     }
 
     /**
@@ -218,55 +221,52 @@ class Input {
      * Drops the threshold if pointer input values are of type mouse pointer
      */
     _dropThreshold() {
-        // The values will be higher in magnitude and keeps constant
-        // for pointer devices like mouse
- 
         var count = 0;
         var val1 = this._queue.dequeue();
         while (!this._queue.isEmpty()) {
             var valNext = this._queue.dequeue();
 
             // mouse input values would typically be constant and higher in magnitude, generally 
-            // in the range of 80 to 130
-            if (valNext >= 80 && valNext == val1) {
-                count += 1;
+            // in the range of 80 to 150
+            if (valNext >= 80 && val1 == valNext) {
+                count ++;
             }
+
             val1 = valNext;
         }
-        
-         // if we encounter such values for at least three in a row then we assume
+        // if we encounter such values for at least three in a row then we assume
         // the user shifted to mouse pointer device
         return count >= 2 ? true: false;
-     }
+    }
 
-     /**
+    /**
      * A wrapper for _mouseWheel to adjust the scrolling according to pointer device in use
      * @param {MouseWheelEvent} event
      */
-     _mouseWheelWrapper(event) {
+    _mouseWheelWrapper(event) {
         var deltaY = Math.trunc(Math.abs(event.deltaY));
+        
         if (this._queue.size() < 4) {
             this._queue.enqueue(deltaY);
-        } 
+        }
 
         if (this._queue.size() == 4) {
             if (this._dropThreshold()) {
                 // user shifted to mouse pointer so reset the values
-                this.allowThreshold = false;
-                this.smallestDelta = 10000;
+                this._allowThreshold = false;
+                this._smallestDeltaY = 10000;
             } else {
                 // setting this variable to true ensures the shift from mouse pointer back to trackpad
-                this.allowThreshold = true;
+                this._allowThreshold = true;
             }
         }
 
         if (this._allowThreshold && this._allowTrackpadScrolling) {
-            // stop trackpad scroll event until next 100ms
             this._allowTrackpadScrolling = false;
             this._mouseWheel(event);
 
             // when threshold is allowed the scroll events being sent to server is limited
-            setTimeout(() => {this._allowTrackpadScrolling = true}, this._wheelThreshold)
+            setTimeout(() => this._allowTrackpadScrolling = true, this._wheelThreshold);
         } else if (!this._allowThreshold) {
             this._mouseWheel(event);
         }
@@ -290,10 +290,10 @@ class Input {
             this._smallestDeltaY = deltaY;
         }
 
-       // normalise the delta values by the scale factor
-       deltaY = Math.floor(deltaY / this._smallestDeltaY);
+        // normalise the delta values by the scale factor
+        deltaY = Math.floor(deltaY / this._smallestDeltaY);
 
-       var magnitude = Math.min(deltaY, this._scrollMagnitude);
+        var magnitude = Math.min(deltaY, this._scrollMagnitude);
 
         var mask = 1 << button;
         var toks;
@@ -576,12 +576,33 @@ class Input {
         this.keyboard = new Guacamole.Keyboard(window);
         this.keyboard.onkeydown = (keysym) => {
             this.send("kd," + keysym);
+            if (!this.keyRepeatList.find(keysym)) {
+                this.keyRepeatList.insert(keysym);
+            }
         };
         this.keyboard.onkeyup = (keysym) => {
             this.send("ku," + keysym);
+            this.keyRepeatList.remove(keysym);
         };
 
         this._windowMath();
+
+        this.keyRepeatRunning = true; 
+        this._handleKeyRepeatEvents();
+    }
+
+    // A handler function to send key-repeat events for keys that are pressed and kept hold
+    async _handleKeyRepeatEvents(){
+        while (this.keyRepeatRunning) {
+            var current = this.keyRepeatList.head;
+            while (current) {
+                var keysym = current.data
+                this.send("kt," + keysym);
+                current = current.next;
+            }
+
+            await this.sleep(200);
+        }
     }
 
     detach() {
@@ -594,6 +615,10 @@ class Input {
             delete this.keyboard;
             this.send("kr");
         }
+
+        // Reset the key-repeat handler
+        this.keyRepeatRunning = false;
+        this.keyRepeatList.clear();
     }
 
     /**
@@ -627,6 +652,14 @@ class Input {
             parseInt((document.body.offsetWidth - document.body.offsetWidth%2) * window.devicePixelRatio),
             parseInt((document.body.offsetHeight - document.body.offsetHeight%2) * window.devicePixelRatio)
         ];
+    }
+
+    async sleep(milliseconds) {
+        await new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve();
+            }, milliseconds);
+        });
     }
 }
 

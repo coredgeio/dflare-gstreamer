@@ -915,6 +915,7 @@ def main():
             # of times, as, a user can enable/disable the webcam 'n' number of times in a single session of desktop streaming.
             if desktop_task.done():
                 app.stop_pipeline()
+                webrtc_input.release_keys()
                 desktop_task = await desktop_pipeline()
 
             if enable_webcam:
@@ -935,6 +936,7 @@ def main():
         loop.run_in_executor(None, lambda: rtc_file_mon.start())
         loop.run_in_executor(None, lambda: system_mon.start())
         loop.run_in_executor(None, lambda: coturn_env_mon.start())
+        loop.run_in_executor(None, lambda: webrtc_input.handle_key_repeat())
 
         loop.run_until_complete(run_the_loop())
             
