@@ -25,7 +25,7 @@
 
 import GamepadManager from "./gamepad.js";
 import Guacamole from "../app/lib/guacamole-keyboard-selkies.js";
-import Queue from "./util.js";
+import { Queue, LinkedList } from "./utils.js";
 
 class Input {
     /**
@@ -132,7 +132,7 @@ class Input {
         this._scrollMagnitude = 10;
 
         // keys pressed list to send key repeat events to server
-        this.keyRepeatQueue = new Queue();
+        this.keyRepeatList = new LinkedList();
     }
 
     /**
@@ -576,13 +576,13 @@ class Input {
         this.keyboard = new Guacamole.Keyboard(window);
         this.keyboard.onkeydown = (keysym) => {
             this.send("kd," + keysym);
-            if (!this.keyRepeatQueue.find(keysym)) {
-                this.keyRepeatQueue.enqueue(keysym);
+            if (!this.keyRepeatList.find(keysym)) {
+                this.keyRepeatList.insert(keysym);
             }
         };
         this.keyboard.onkeyup = (keysym) => {
             this.send("ku," + keysym);
-            this.keyRepeatQueue.remove(keysym);
+            this.keyRepeatList.remove(keysym);
         };
 
         this._windowMath();
@@ -594,13 +594,14 @@ class Input {
     // A handler function to send key-repeat events for keys that are pressed and kept hold
     async _handleKeyRepeatEvents(){
         while (this.keyRepeatRunning) {
-            var keysyms = this.keyRepeatQueue.toArray();
-
-            for(var keysym of keysyms){
+            var current = this.keyRepeatList.head;
+            while (current) {
+                var keysym = current.data
                 this.send("kt," + keysym);
+                current = current.next;
             }
 
-            await this.sleep(2000);
+            await this.sleep(200);
         }
     }
 
@@ -616,8 +617,8 @@ class Input {
         }
 
         // Reset the key-repeat handler
-        this.keyRepeatQueue.clear();
         this.keyRepeatRunning = false;
+        this.keyRepeatList.clear();
     }
 
     /**

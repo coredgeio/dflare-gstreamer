@@ -32,6 +32,7 @@ from subprocess import Popen, PIPE, STDOUT
 import socket
 import time
 from PIL import Image
+from utils import LinkedList
 
 import logging
 logger = logging.getLogger("webrtc_input")
@@ -101,7 +102,7 @@ class WebRTCInput:
         self.ping_start = None
 
         # Stores key-repeat keys with arrival time
-        self.key_repeat_keys = {}
+        self.key_repeat_keys = LinkedList()
 
         self.on_video_encoder_bit_rate = lambda bitrate: logger.warn(
             'unhandled on_video_encoder_bit_rate')
@@ -269,11 +270,14 @@ class WebRTCInput:
         # Although prevented in most cases, this fix may present issues in some keyboard layouts
         if keysym == 60 and self.keyboard._display.keysym_to_keycode(keysym) == 94:
             keysym = 44
-        
+
         if key_repeat:
             # Set or update the timestamp of the key
-            logger.info("Key-repeat bro for: " + str(keysym))
-            self.key_repeat_keys[keysym] = time.monotonic()
+            if self.key_repeat_keys.find(keysym) is None:
+                self.key_repeat_keys.insert(keysym, time.monotonic())
+            else:
+                self.key_repeat_keys.remove(keysym)
+                self.key_repeat_keys.insert(keysym, time.monotonic())
             return
         
         keycode = pynput.keyboard.KeyCode(keysym)
@@ -282,24 +286,28 @@ class WebRTCInput:
         else:
             self.keyboard.release(keycode)
 
-            if self.key_repeat_keys.get(keysym):
-                del self.key_repeat_keys[keysym]
+            if self.key_repeat_keys.find(keysym):
+                self.key_repeat_keys.remove(keysym)
 
     def handle_key_repeat(self):
-        """Handles key-repeat event keys by monitoring the pressed keys from the 
+        """Handles key-repeat event keys by monitoring the pressed keys from the
            dictionary object and releases those based on the elapsed time
         """
         while True:
             now = time.monotonic()
 
-            # Iterating over a copy of the data
-            for key, timeout in tuple(self.key_repeat_keys.items()):
+            current = self.key_repeat_keys.head
+            while current:
+                key = current.data
+                timeout = current.timestamp
                 elapsed_time = now - timeout
 
-                # Release the key if elapsed time is over 1.5s 
-                if elapsed_time >= 1.5:
+                # Release the key if elapsed time is over 1.0s
+                if elapsed_time >= 1.0:
                     self.send_x11_keypress(key, down=False)
-            time.sleep(0.2)
+
+                current = current.next
+            time.sleep(0.1)
 
     def send_x11_mouse(self, x, y, button_mask, scroll_magnitude, relative=False):
         """Sends mouse events to the X server.
