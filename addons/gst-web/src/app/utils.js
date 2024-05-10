@@ -109,3 +109,19 @@ export class LinkedList {
       this.head = null;
   }
 }
+
+// Converts given string to base64 encoded string with UTF-8 format
+export function stringToBase64(text) {
+    var bytes = new TextEncoder().encode(text);
+    const binString = Array.from(bytes, (byte) =>
+      String.fromCodePoint(byte),
+    ).join("");
+    return btoa(binString);
+}
+
+// Converts given base64 UTF-8 format encoded string to its original form
+export function base64ToString(base64) {
+    var stringBytes = atob(base64);
+    var bytes = Uint8Array.from(stringBytes, (m) => m.codePointAt(0));
+    return new TextDecoder().decode(bytes);
+}

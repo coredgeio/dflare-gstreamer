@@ -25,6 +25,7 @@ import WebRTCDemo from './webrtc.js';
 import "./css/style.css"
 import "./css/vuetify.css"
 import "./manifest.json";
+import { stringToBase64 } from './utils.js'
 
 runApp();
 function runApp() {
@@ -578,7 +579,7 @@ function runApp() {
     navigator.clipboard
       .readText()
       .then((text) => {
-        webrtc.sendDataChannelMessage("cw," + btoa(text));
+        webrtc.sendDataChannelMessage("cw," + stringToBase64(text));
       })
       .catch((err) => {
         webrtc._setStatus("Failed to read clipboard contents: " + err);
