@@ -540,6 +540,7 @@ class GSTWebRTCApp:
 
         # Create element for receiving audio from pulseaudio.
         pulsesrc = Gst.ElementFactory.make("pulsesrc", "pulsesrc")
+        pulsesrc.set_property("device", "output.monitor")
 
         # Let the audio source provide the global clock.
         # This is important when trying to keep the audio and video
@@ -1007,15 +1008,15 @@ class GSTWebRTCApp:
         loop.run_until_complete(self.on_ice(mlineindex, candidate))
    
     def handle_incoming_video_track(self, pad):
-        rtph264depay = Gst.ElementFactory.make("rtph264depay", "rtph264depay")
-
         caps = Gst.caps_from_string("application/x-rtp")
         caps.set_value("media", "video")
         caps.set_value("encoding-name", "H264")
-        caps.set_value("payload", 123)
+        caps.set_value("payload", 106)
         caps.set_value("clock-rate", 90000)
-        caps_fileter = Gst.ElementFactory.make("capsfilter", "capsfilter")
-        caps_fileter.set_property("caps", caps)
+        rtph264depay_capsfilter = Gst.ElementFactory.make("capsfilter")
+        rtph264depay_capsfilter.set_property("caps", caps)
+
+        rtph264depay = Gst.ElementFactory.make("rtph264depay", "rtph264depay")
 
         avdec_h264 = Gst.ElementFactory.make("avdec_h264", "avdec_h264")
 
@@ -1024,34 +1025,54 @@ class GSTWebRTCApp:
         v4l2sink = Gst.ElementFactory.make("v4l2sink", "v4l2sink")
         v4l2sink.set_property("device", self.video_device)
         
-        self.pipeline.add(rtph264depay, v4l2sink, avdec_h264, videoconvert)
-
+        self.pipeline.add(rtph264depay_capsfilter, rtph264depay, v4l2sink, avdec_h264, videoconvert)
+        rtph264depay_capsfilter.sync_state_with_parent()
         rtph264depay.sync_state_with_parent()
         v4l2sink.sync_state_with_parent()
         avdec_h264.sync_state_with_parent()
         videoconvert.sync_state_with_parent()
 
-        pad.link(rtph264depay.get_static_pad('sink'))
+        pad.link(rtph264depay_capsfilter.get_static_pad('sink'))
+        rtph264depay_capsfilter.link(rtph264depay)
         rtph264depay.link(avdec_h264)
         avdec_h264.link(videoconvert)
         videoconvert.link(v4l2sink)
 
     def handle_incoming_audio_track(self, pad):
+        queue = Gst.ElementFactory.make("queue", "queue")
+
+        rtpopusdepay_caps = Gst.caps_from_string("application/x-rtp")
+        rtpopusdepay_caps.set_value("encoding-name", "OPUS")
+        rtpopusdepay_caps.set_value("payload", 111)
+        rtpopusdepay_caps.set_value("media", "audio")
+        rtpopusdepay_capfilter = Gst.ElementFactory.make("capsfilter")
+        rtpopusdepay_capfilter.set_property("caps", rtpopusdepay_caps)
+
         rtpopusdepay = Gst.ElementFactory.make("rtpopusdepay", "rtpopusdepay")
         opusdec = Gst.ElementFactory.make("opusdec", "opusdec")
+        opusdec.set_property("use-inband-fec", True)
+
         audioconvert = Gst.ElementFactory.make("audioconvert", "audioconvert")
         audioresample = Gst.ElementFactory.make("audioresample", "audioresample")
         pulsesink = Gst.ElementFactory.make("pulsesink", "pulsesink")
         pulsesink.set_property("device", "virtmic")
 
-        self.pipeline.add(rtpopusdepay, opusdec, audioconvert, audioresample, pulsesink)
+        # Fix: Clock skew warning
+        # might be helpful to look https://gstreamer.freedesktop.org/documentation/audio/gstaudiobasesink.html?gi-language=c#GstAudioBaseSinkSlaveMethod
+        # pulsesink.set_property("slave-method", 1)
+
+        self.pipeline.add(queue, rtpopusdepay_capfilter, rtpopusdepay, opusdec, audioconvert, audioresample, pulsesink)
+        queue.sync_state_with_parent()
+        rtpopusdepay_capfilter.sync_state_with_parent()
         rtpopusdepay.sync_state_with_parent()
         opusdec.sync_state_with_parent()
         audioconvert.sync_state_with_parent()
         audioresample.sync_state_with_parent()
         pulsesink.sync_state_with_parent()
 
-        pad.link(rtpopusdepay.get_static_pad('sink'))
+        pad.link(queue.get_static_pad('sink'))
+        queue.link(rtpopusdepay_capfilter)
+        rtpopusdepay_capfilter.link(rtpopusdepay)
         rtpopusdepay.link(opusdec)
         opusdec.link(audioconvert)
         audioconvert.link(audioresample)
@@ -1079,6 +1100,14 @@ class GSTWebRTCApp:
         
         self.webrtcbin.emit('add-transceiver', GstWebRTC.WebRTCRTPTransceiverDirection.RECVONLY, codec_caps)
 
+        # Set NACK for retransmission of lost packets
+        transceiver = self.webrtcbin.emit("get-transceiver", 0)
+        transceiver.set_property("do-nack", True)
+
+        # TODO: Stting up FEC is adding up 3 more pt types, should only be two.
+        # Also, NACK should suffice for now. But FEC could impove the quality further?
+        # transceiver.set_property("fec-type", GstWebRTC.WebRTCFECType.ULP_RED)
+
         # Audio transceiver
         codec_caps_audio = Gst.caps_from_string("application/x-rtp")
         codec_caps_audio.set_value("media", "audio")
@@ -1088,6 +1117,15 @@ class GSTWebRTCApp:
         codec_caps_audio.set_value("stereo", "0")
         codec_caps_audio.set_value("encoding-params", "2")
         self.webrtcbin.emit("add-transceiver", GstWebRTC.WebRTCRTPTransceiverDirection.RECVONLY, codec_caps_audio)
+
+        # # Set NACK for retransmission of lost packets
+        # # TODO: Find out why setting NACK to audio transceiver is faling with continuous 
+        # # errors ""rtpsession rtpsession.c:4046:session_nack: Removing 1 expired NACKS""
+        # transceiver = self.webrtcbin.emit("get-transceiver", 1)
+        # transceiver.set_property("do-nack", True)
+
+        audioTrans = self.webrtcbin.emit("get-transceiver", 1)
+        audioTrans.set_property("fec-type", GstWebRTC.WebRTCFECType.ULP_RED)
 
     def start_pipeline(self):
         """Starts the GStreamer pipeline
@@ -1130,14 +1168,6 @@ class GSTWebRTCApp:
             # Enable NACKs on the transceiver, helps with retransmissions and freezing when packets are dropped.
             transceiver = self.webrtcbin.emit("get-transceiver", 0)
             transceiver.set_property("do-nack", True)
-
-        if self.webcam:
-            # Enable FEC for webcam transceivers
-            transceiver0 = self.webrtcbin.emit("get-transceiver", 0)
-            transceiver0.set_property("fec-type", GstWebRTC.WebRTCFECType.ULP_RED)
-
-            transceiver1 = self.webrtcbin.emit("get-transceiver", 1)
-            transceiver1.set_property("fec-type", GstWebRTC.WebRTCFECType.ULP_RED)
 
         logger.info(f"pipeline started for {'video & audio' if not self.webcam else 'webcam'}")
     

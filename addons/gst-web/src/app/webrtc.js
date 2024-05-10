@@ -298,6 +298,19 @@ class WebRTCDemo {
                             }
                         }
                     } 
+                    
+                    if (this.webcam) {
+                        // Override SDP to reduce Opus packet size to 2.5 ms
+                        if (!(/[^-]minptime=3[^\d]/gm.test(local_sdp.sdp))) {
+                            console.log("Overriding WebRTC SDP to allow low-latency audio packet");
+                            if (/[^-]minptime=\d+/gm.test(local_sdp.sdp)) {
+                                local_sdp.sdp = local_sdp.sdp.replace(/minptime=\d+/gm, 'minptime=3');
+                            } else {
+                                local_sdp.sdp = local_sdp.sdp.replace('useinbandfec=', 'minptime=3;useinbandfec=')
+                            }
+                        }
+                    }
+                    
                     console.log("Created local SDP", local_sdp);
                     this.peerConnection.setLocalDescription(local_sdp).then(() => {
                         this._setDebug("Sending SDP answer");
