@@ -181,6 +181,16 @@ class WebRTCDemo {
                 this._send_channel.send(data);
             }
         })
+
+        /**
+         * @type {Object}
+         */
+        this._stream = null;
+
+        /**
+         * @type {Boolean}
+         */
+        this.webcam = false
     }
 
     /**
@@ -276,16 +286,31 @@ class WebRTCDemo {
             this.peerConnection.createAnswer()
                 .then((local_sdp) => {
                     // Override SDP to enable stereo on WebRTC Opus with Chromium, must be munged before the Local Description
-                    if (local_sdp.sdp.indexOf('multiopus') === -1) {
-                        if (!(/[^-]stereo=1/gm.test(local_sdp.sdp))) {
-                            console.log("Overriding WebRTC SDP to allow stereo audio");
-                            if (/[^-]stereo=0/gm.test(local_sdp.sdp)) {
-                                local_sdp.sdp = local_sdp.sdp.replace('stereo=0', 'stereo=1');
+                    if (!this.webcam) {
+                        if (local_sdp.sdp.indexOf('multiopus') === -1) {
+                            if (!(/[^-]stereo=1/gm.test(local_sdp.sdp))) {
+                                console.log("Overriding WebRTC SDP to allow stereo audio");
+                                if (/[^-]stereo=0/gm.test(local_sdp.sdp)) {
+                                    local_sdp.sdp = local_sdp.sdp.replace('stereo=0', 'stereo=1');
+                                } else {
+                                    local_sdp.sdp = local_sdp.sdp.replace('useinbandfec=', 'stereo=1;useinbandfec=');
+                                }
+                            }
+                        }
+                    } 
+                    
+                    if (this.webcam) {
+                        // Override SDP to reduce Opus packet size to 2.5 ms
+                        if (!(/[^-]minptime=3[^\d]/gm.test(local_sdp.sdp))) {
+                            console.log("Overriding WebRTC SDP to allow low-latency audio packet");
+                            if (/[^-]minptime=\d+/gm.test(local_sdp.sdp)) {
+                                local_sdp.sdp = local_sdp.sdp.replace(/minptime=\d+/gm, 'minptime=3');
                             } else {
-                                local_sdp.sdp = local_sdp.sdp.replace('useinbandfec=', 'stereo=1;useinbandfec=');
+                                local_sdp.sdp = local_sdp.sdp.replace('useinbandfec=', 'minptime=3;useinbandfec=')
                             }
                         }
                     }
+                    
                     console.log("Created local SDP", local_sdp);
                     this.peerConnection.setLocalDescription(local_sdp).then(() => {
                         this._setDebug("Sending SDP answer");
@@ -670,6 +695,88 @@ class WebRTCDemo {
             this.peerConnection.setConfiguration(config);
         }
         this.signalling.connect();
+    }
+
+    /**
+     * Retrieves the media devices to capture webcam data
+     */
+    async getMediaDevices() {
+        var errorOccured = false
+        try {
+            this._stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+            });
+        } catch(error) {
+            errorOccured = true
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                console.log("Failed to get permission: ", error.message)
+            } else {
+                console.error('Error accessing media devices', error);
+            }
+        }
+        if (errorOccured){
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Initiates the connection to stream webcam data
+     */
+    async connectWebcam() {
+        var consentReceived = await this.getMediaDevices() 
+        if (!consentReceived) {
+            console.log("User media unavailable")
+            return false
+        }
+
+        // Create the peer connection object and bind callbacks.
+        this.peerConnection = new RTCPeerConnection(this.rtcPeerConfig);
+        this.peerConnection.ontrack = this._ontrack.bind(this);
+        this.peerConnection.onicecandidate = this._onPeerICE.bind(this);
+        this.peerConnection.ondatachannel = this._onPeerdDataChannel.bind(this);
+
+         // Add the webcam tracks to peerConnection object
+        if (this._stream) {
+            for (const track of this._stream.getTracks()) {
+                this.peerConnection.addTrack(track, this._stream);
+            }
+        }
+       
+        this.peerConnection.onconnectionstatechange = () => {
+            // Local event handling.
+            this._handleConnectionStateChange(this.peerConnection.connectionState);
+
+            // Pass state to event listeners.
+            this._setConnectionState(this.peerConnection.connectionState);
+        };
+
+        if (this.forceTurn) {
+            this._setStatus("forcing use of TURN server");
+            var config = this.peerConnection.getConfiguration();
+            config.iceTransportPolicy = "relay";
+            this.peerConnection.setConfiguration(config);
+        }
+        this.signalling.connect();
+    }
+
+    /**
+     * Handles closing of webcam peer connection
+     */
+    closePeerConnection(){
+        this.signalling.disconnect();
+
+        // Close the connection which in turn handles releasing of all resources 
+        // of webrtc, ice, rtp senders, etc
+        if (this.peerConnection)
+            this.peerConnection.close();
+
+        // Release the user media streams
+        if (this._stream) {
+            this._stream.getTracks().forEach(track => track.stop());
+        }
+        this._setStatus("Connection closed intentionally")
     }
 
     /**

@@ -3,3 +3,4 @@ dist
 coturn_env
 src/*.egg-info
 NOTES.md
+src/selkies_gstreamer/__pycache__

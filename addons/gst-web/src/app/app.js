@@ -27,6 +27,7 @@ import "./css/vuetify.css"
 import "./manifest.json";
 
 runApp();
+
 function runApp() {
   // Service Worker to support PWA
   window.onload = () => {
@@ -77,6 +78,8 @@ function runApp() {
           { text: "100 fps", value: 100 },
         ],
         audioEnabled: true,
+        webcamEnabled: false,
+        webcamStatus: false,
         audioBitRate: 32000,
         audioBitRateOptions: [
           { text: "32 kb/s", value: 32000 },
@@ -271,18 +274,37 @@ function runApp() {
       },
       audioEnabled(newValue, oldValue) {
         if (newValue === null) return;
-        console.log(
-          "audio enabled changed from " + oldValue + " to " + newValue
-        );
+        console.log("audio enabled changed from " + oldValue + " to " + newValue);
         if (oldValue !== null && newValue !== oldValue)
           webrtc.sendDataChannelMessage("_arg_audio," + newValue);
         this.setBoolParam("audioEnabled", newValue);
       },
+      webcamEnabled(newValue, oldValue) {
+        if (newValue === null) return;
+        console.log("webcam enabled changed from " + oldValue + " to " + newValue);
+        if (oldValue !== null && newValue !== oldValue && newValue === false) {
+          webrtc.sendDataChannelMessage("_arg_webcam," + newValue);
+          this.setBoolParam("webcamEnabled", newValue);
+
+          // handle disconnection of webrtc connection of webcam
+          webcam_webrtc.closePeerConnection();
+        }
+        if (newValue === true){
+          var receivedConsent = webcam_webrtc.connectWebcam();
+          receivedConsent.then(consent => {
+            if (consent === false) {
+              this.webcamEnabled=false;
+            } else {
+              // Got user consent for media devices and peerConnection is setup from client side
+              webrtc.sendDataChannelMessage("_arg_webcam," + newValue);
+              this.setBoolParam("webcamEnabled", newValue);
+            }
+          })
+        }
+      },
       resizeRemote(newValue, oldValue) {
         if (newValue === null) return;
-        console.log(
-          "resize remote changed from " + oldValue + " to " + newValue
-        );
+        console.log("resize remote changed from " + oldValue + " to " + newValue);
         app.windowResolution = webrtc.input.getWindowResolution();
         var res = app.windowResolution[0] + "x" + app.windowResolution[1];
         if (oldValue !== null && newValue !== oldValue)
@@ -365,13 +387,12 @@ function runApp() {
   // WebRTC entrypoint, connect to the signalling server
   /*global WebRTCDemoSignalling, WebRTCDemo*/
   var protocol = location.protocol == "http:" ? "ws://" : "wss://";
-  var signalling = new WebRTCDemoSignalling(
-    new URL(
-      protocol + window.location.host + app.appName + "/signalling/"
-    ),
-    1
-  );
+  var signalling = new WebRTCDemoSignalling(new URL(protocol + window.location.host + app.appName + "/signalling/"), 1);
+  var webcam_signalling = new WebRTCDemoSignalling(new URL(protocol + window.location.host + app.appName + "/signalling/"), 3);
+
   var webrtc = new WebRTCDemo(signalling, videoElement);
+  var webcam_webrtc = new WebRTCDemo(webcam_signalling);
+  webcam_webrtc.webcam = true;
 
   // Function to add timestamp to logs.
   var applyTimestamp = (msg) => {
@@ -397,12 +418,10 @@ function runApp() {
   };
 
   // Send webrtc status and error messages to logs.
-  webrtc.onstatus = (message) => {
-    app.logEntries.push(applyTimestamp("[webrtc] " + message));
-  };
-  webrtc.onerror = (message) => {
-    app.logEntries.push(applyTimestamp("[webrtc] [ERROR] " + message));
-  };
+  webrtc.onstatus = (message) => {app.logEntries.push(applyTimestamp("[webrtc] " + message))};
+  webrtc.onerror = (message) => {app.logEntries.push(applyTimestamp("[webrtc] [ERROR] " + message))};
+  webcam_webrtc.onstatus = (message) => { app.logEntries.push(applyTimestamp("[webcam webrtc] " + message)) };
+  webcam_webrtc.onerror = (message) => { app.logEntries.push(applyTimestamp("[webcam webrtc] [ERROR] " + message)) };
 
   if (app.debug) {
     signalling.ondebug = (message) => {
@@ -719,6 +738,8 @@ function runApp() {
       }
     } else if (action.startsWith("hostname")){
         app.workspaceName = action.split(",")[1]
+    } else if (action.startsWith("webcam")) {
+        app.webcamStatus = action.split(",")[1].toLowerCase() === "true";
     } else {
       webrtc._setStatus("Unhandled system action: " + action);
     }
@@ -785,20 +806,19 @@ function runApp() {
     .then((config) => {
       // for debugging, force use of relay server.
       webrtc.forceTurn = app.turnSwitch;
+      webcam_webrtc.forceTurn = app.turnSwitch;
 
       // get initial local resolution
       app.windowResolution = webrtc.input.getWindowResolution();
 
       if (config.iceServers.length > 1) {
-        app.debugEntries.push(
-          applyTimestamp(
-            "[app] using TURN servers: " + config.iceServers[1].urls.join(", ")
-          )
-        );
+        app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + config.iceServers[1].urls.join(", ")));
       } else {
         app.debugEntries.push(applyTimestamp("[app] no TURN servers found."));
       }
       webrtc.rtcPeerConfig = config;
       webrtc.connect();
+
+      webcam_webrtc.rtcPeerConfig = config;
     });
 }

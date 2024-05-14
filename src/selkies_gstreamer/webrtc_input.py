@@ -136,6 +136,8 @@ class WebRTCInput:
             'unhandled on_client_available_bandwidth')
         self.on_client_resolution = lambda resolution: logger.warn(
             'unhandled on_client_resolution')
+        self.on_set_enable_webcam = lambda enabled: logger.warn(
+            'unhandled on_set_enable_webcam')
 
     def __keyboard_connect(self):
         self.keyboard = pynput.keyboard.Controller()
@@ -609,6 +611,11 @@ class WebRTCInput:
             enabled = toks[1].lower() == "true"
             logger.info("Setting enable_audio to: %s" % str(enabled))
             self.on_set_enable_audio(enabled)
+        elif toks[0] == "_arg_webcam":
+            # Set audio enabled
+            enabled = toks[1].lower() == "true"
+            logger.info("Setting enable_webcam to: %s" % str(enabled))
+            self.on_set_enable_webcam(enabled)
         elif toks[0] == "_arg_resize":
             if len(toks) != 3:
                 logger.error("invalid _arg_resize commnad, expected 2 arguments <enabled>,<resolution>")
