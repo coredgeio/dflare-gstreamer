@@ -1,10 +1,12 @@
 # Supported base images: ubuntu:22.04, ubuntu:20.04
 
 ARG UBUNTU_RELEASE=20.04
+# The 'main' tag of dstreamer-python-build and dstreamer-web-img points to
+# most recent commits of the repo, use 'latest' for recent release
+ARG RELEASE_TAG=main
 FROM ghcr.io/selkies-project/selkies-gstreamer/gstreamer:v1.5.2-ubuntu${UBUNTU_RELEASE} as selkies-gstreamer
-# The latest tag of python-build and web-img points to v1.1.0
-FROM docker.io/mohanj7/python-build:latest as selkies-build
-FROM docker.io/mohanj7/web-img:latest as selkies-web
+FROM coredgeio/dstreamer-python-build:${RELEASE_TAG} as selkies-build
+FROM coredgeio/dstreamer-web-img:${RELEASE_TAG} as selkies-web
 FROM ubuntu:${UBUNTU_RELEASE}
 ARG UBUNTU_RELEASE
 
