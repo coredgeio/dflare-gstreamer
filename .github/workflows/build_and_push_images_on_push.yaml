@@ -36,3 +36,9 @@ jobs:
         cd docker-images/base/dstreamer
         docker build . --tag coredgeio/dstreamer:main
         docker push coredgeio/dstreamer:main
+    
+    - name: Build and push desktop
+      run: |
+        cd docker-images/base/desktop
+        docker build . --tag coredgeio/dstreamer-desktop:main
+        docker push coredgeio/dstreamer-desktop:main

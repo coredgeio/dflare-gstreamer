@@ -11,8 +11,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-instal
         sudo 
 
 # Installing KDE(Kate Desktop Environment) and other GUI packages
-ENV XDG_CURRENT_DESKTOP KDE
-ENV KWIN_COMPOSE N
+ENV XDG_CURRENT_DESKTOP=KDE
+ENV KWIN_COMPOSE=N
 RUN mkdir -pm755 /etc/apt/preferences.d && echo "Package: firefox*\n\
 Pin: version 1:1snap*\n\
 Pin-Priority: -1" > /etc/apt/preferences.d/firefox-nosnap && \
@@ -72,7 +72,7 @@ RUN groupadd -g 1000 ${USERR} && \
     passwd -d ${USERR} 
     
 # Add Tini init script - take care of runaway processes
-ENV TINI_VERSION v0.7.0
+ENV TINI_VERSION=v0.7.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 
@@ -93,9 +93,9 @@ COPY configure_ui.sh /
 COPY bookmark-manager.sh /
 COPY ./dstreamer_agent/dstreamer-agent /usr/bin/dstreamer-agent
 
-ENV XDG_RUNTIME_DIR /tmp/runtime-user
-ENV HOSTNAME Workspace-test
-ENV SHELL /bin/bash
+ENV XDG_RUNTIME_DIR=/tmp/runtime-user
+ENV HOSTNAME=Workspace-test
+ENV SHELL=/bin/bash
 ENV USER=${USERR}
 
 RUN apt-get update && apt-get install -y netcat

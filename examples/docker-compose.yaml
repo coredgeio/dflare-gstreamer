@@ -14,7 +14,7 @@ services:
       - /run/pulse:/run/pulse
       - /run/dstreamer:/run/dstreamer/
     depends_on:
-      - workspace
+      - desktop
     environment:
       - TURN_HOST=d1.dflare.io
       - TURN_PORT=3478
@@ -22,12 +22,12 @@ services:
       - TURN_PASSWORD=yourpassword
       - DISPLAY=:1
     
-  workspace:
-    container_name: workspace
-    image: workspace-test:latest
+  desktop:
+    container_name: desktop
+    image: desktop-test:latest
     build: 
       context: .
-      dockerfile: Dockerfile-workspace
+      dockerfile: Dockerfile-desktop
     shm_size: '1gb'
     environment:
       - DISPLAY=:1

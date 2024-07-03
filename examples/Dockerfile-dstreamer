@@ -4,9 +4,9 @@ ARG UBUNTU_RELEASE=20.04
 # The 'main' tag of dstreamer-python-build and dstreamer-web-img points to
 # most recent commits of the repo, use 'latest' for recent release
 ARG RELEASE_TAG=main
-FROM ghcr.io/selkies-project/selkies-gstreamer/gstreamer:v1.5.2-ubuntu${UBUNTU_RELEASE} as selkies-gstreamer
-FROM coredgeio/dstreamer-python-build:${RELEASE_TAG} as selkies-build
-FROM coredgeio/dstreamer-web-img:${RELEASE_TAG} as selkies-web
+FROM ghcr.io/selkies-project/selkies-gstreamer/gstreamer:v1.5.2-ubuntu${UBUNTU_RELEASE} AS selkies-gstreamer
+FROM coredgeio/dstreamer-python-build:${RELEASE_TAG} AS selkies-build
+FROM coredgeio/dstreamer-web-img:${RELEASE_TAG} AS selkies-web
 FROM ubuntu:${UBUNTU_RELEASE}
 ARG UBUNTU_RELEASE
 
@@ -101,7 +101,7 @@ COPY --from=selkies-build /opt/pypi/dist/${PYPI_PACKAGE}-${PACKAGE_VERSION}-py3-
 RUN pip3 install /opt/${PYPI_PACKAGE}-${PACKAGE_VERSION}-py3-none-any.whl
 
 # Add Tini init script - take care of runaway processes
-ENV TINI_VERSION v0.7.0
+ENV TINI_VERSION=v0.7.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 
