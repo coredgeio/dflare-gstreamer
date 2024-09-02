@@ -42,7 +42,7 @@ class GSTWebRTCAppError(Exception):
 
 
 class GSTWebRTCApp:
-    def __init__(self, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None, webcam=False, video_device="/dev/video0"):
+    def __init__(self, asymmetric_ice_mode, stun_servers=None, turn_servers=None, audio=True, audio_channels=2, framerate=30, encoder=None, video_bitrate=2000, audio_bitrate=64000, hostname=None, webcam=False, video_device="/dev/video0"):
         """Initialize GStreamer WebRTC app.
 
         Initializes GObjects and checks for required plugins.
@@ -68,6 +68,7 @@ class GSTWebRTCApp:
         self.audio_bitrate = audio_bitrate
         self.hostname = hostname
 
+        self.asymmetric_ice_mode = asymmetric_ice_mode
         self.webcam = webcam
         self.video_device = video_device
 
@@ -135,16 +136,19 @@ class GSTWebRTCApp:
         if self.webcam:
             self.webrtcbin.connect('pad-added', self.on_incomig_webcam_stream)
 
-        # Add STUN server
-        # TODO: figure out how to add more than 1 stun server.
-        if self.stun_servers:
-            self.webrtcbin.set_property("stun-server", self.stun_servers[0])
+        # Skip providing stun/turn server details thus forcing the server to generate only host candidates
+        # which is the required scenario for Asymmetric ICE mode.
+        if not self.asymmetric_ice_mode:
+            # Add STUN server
+            # TODO: figure out how to add more than 1 stun server.
+            if self.stun_servers:
+                self.webrtcbin.set_property("stun-server", self.stun_servers[0])
 
-        # Add TURN server
-        if self.turn_servers:
-            for turn_server in self.turn_servers:
-                logger.info("adding TURN server: %s" % turn_server)
-                self.webrtcbin.emit("add-turn-server", turn_server)
+            # Add TURN server
+            if self.turn_servers:
+                for turn_server in self.turn_servers:
+                    logger.info("adding TURN server: %s" % turn_server)
+                    self.webrtcbin.emit("add-turn-server", turn_server)
 
         # Add element to the pipeline.
         self.pipeline.add(self.webrtcbin)

@@ -152,14 +152,14 @@ class RTCConfigFileMonitor:
         self.running = False
 
 class CoturnEnvVarMonitor:
-    def __init__(self, turn_host, turn_port, turn_username, turn_password, turn_protocol='udp', turn_tls=False, period=15):
+    def __init__(self, turn_host, turn_port, turn_username, turn_password, turn_protocol='udp', turn_tls=False, using_stunner=False, period=15):
         self.turn_host = turn_host
         self.turn_port = turn_port
         self.turn_username = turn_username
         self.turn_password = turn_password
         self.turn_protocol = turn_protocol
         self.turn_tls = "true" if turn_tls else "false"
-
+        self.stunner = "true" if using_stunner else "false"
         self.running = False
         self.period = period
 
@@ -176,11 +176,12 @@ class CoturnEnvVarMonitor:
             up_turn_password = os.environ.get("TURN_PASSWORD")
             up_turn_protocol = os.environ.get("TURN_PROTOCOL", "udp")
             up_turn_tls = os.environ.get("TURN_TLS", "false")
+            up_stunner = os.environ.get("WEBRTC_STUNNER", "false")
 
             # if any environment variable changes/updates
             if (self.turn_host != up_turn_host or self.turn_port != up_turn_port or self.turn_username != up_turn_username
-                    or self.turn_password != up_turn_password or self.turn_protocol != up_turn_protocol or self.turn_tls != up_turn_tls):
-                data = make_turn_rtc_config_json(up_turn_host, up_turn_port, up_turn_username, up_turn_password, up_turn_protocol, up_turn_tls)
+                    or self.turn_password != up_turn_password or self.turn_protocol != up_turn_protocol or self.turn_tls != up_turn_tls or self.stunner != up_stunner):
+                data = make_turn_rtc_config_json(up_turn_host, up_turn_port, up_turn_username, up_turn_password, up_turn_protocol, up_turn_tls, up_stunner)
                 stun_servers, turn_servers, rtc_config = parse_rtc_config(data)
                 self.on_rtc_config(stun_servers, turn_servers, rtc_config)
 
@@ -190,6 +191,7 @@ class CoturnEnvVarMonitor:
                 self.turn_password = up_turn_password
                 self.turn_protocol = up_turn_protocol
                 self.turn_tls = up_turn_tls
+                self.stunner = up_stunner
 
             time.sleep(self.period)
 
@@ -197,26 +199,34 @@ class CoturnEnvVarMonitor:
         self.running = False
 
 
-def make_turn_rtc_config_json(host, port, username, password, protocol='udp', tls=False):
-    return """{
-  "lifetimeDuration": "86400s",
-  "iceServers": [
-    {
-      "urls": [
-        "stun:%s:%s"
-      ]
-    },
-    {
-      "urls": [
-        "%s:%s:%s?transport=%s"
-      ],
-      "username": "%s",
-      "credential": "%s"
-    }
-  ],
-  "blockStatus": "NOT_BLOCKED",
-  "iceTransportPolicy": "all"
-}""" % (host, port, 'turns' if tls else 'turn', host, port, protocol, username, password)
+def make_turn_rtc_config_json(turn_host, turn_port, username, password, protocol='udp', turn_tls=False, stunner=False, stun_host=None, stun_port=None):
+    stun_list = ["stun:{}:{}".format(turn_host, turn_port)]
+    if stun_host is not None and stun_port is not None and (stun_host != turn_host or str(stun_port) != str(turn_port)):
+        stun_list.insert(0, "stun:{}:{}".format(stun_host, stun_port))
+    if stun_host != "stun.l.google.com" or (str(stun_port) != "19302"):
+        stun_list.append("stun:stun.l.google.com:19302")
+
+    rtc_config = {}
+    rtc_config["lifetimeDuration"] = "86400s"
+    rtc_config["blockStatus"] = "NOT_BLOCKED"
+    rtc_config["iceTransportPolicy"] = "all" if not stunner else 'relay'
+    rtc_config["iceServers"] = []
+
+    # As STUNner is primarily used for TURN functinality, we skip STUN servers
+    if not stunner:
+        rtc_config["iceServers"].append({
+            "urls": stun_list
+        })
+
+    rtc_config["iceServers"].append({
+        "urls": [
+            "{}:{}:{}?transport={}".format('turns' if turn_tls else 'turn', turn_host, turn_port, protocol)
+        ],
+        "username": username,
+        "credential": password
+    })
+
+    return json.dumps(rtc_config, indent=2)
 
 def parse_rtc_config(data):
     ice_servers = json.loads(data)['iceServers']
@@ -465,6 +475,12 @@ def main():
     parser.add_argument('--video_device',
                         default=os.environ.get("WEBRTC_VIDEO_DEVICE", "/dev/video0"),
                         help='Virtual video device to stream the webcam video media to')
+    parser.add_argument('--asymmetric_ice_mode',
+                        default=os.environ.get('WEBRTC_ASYMMETRIC_ICE_MODE', 'false'),
+                        help='Only generates host type ice candidates from server side; relevant when STUNner is being used')
+    parser.add_argument('--stunner',
+                        default=os.environ.get("WEBRTC_STUNNER", 'false'),
+                        help='Set it to true if STUNner is being used, which forces a relay connection')
     args = parser.parse_args()
 
     if os.path.exists(args.json_config):
@@ -556,6 +572,7 @@ def main():
     using_coturn = False
     using_hmac_turn = False
     using_rtc_config_json = False
+    using_stunner = args.stunner.lower() == "true"
     if os.path.exists(args.rtc_config_json):
         logger.warning("Using file for RTC config: %s", args.rtc_config_json)
         with open(args.rtc_config_json, 'r') as f:
@@ -575,7 +592,7 @@ def main():
                 logger.error("missing turn host and turn port")
                 sys.exit(1)
             logger.warning("using legacy non-HMAC TURN credentials.")
-            config_json = make_turn_rtc_config_json(args.turn_host, args.turn_port, args.turn_username, args.turn_password, turn_protocol, using_turn_tls)
+            config_json = make_turn_rtc_config_json(args.turn_host, args.turn_port, args.turn_username, args.turn_password, turn_protocol, using_turn_tls, using_stunner)
             stun_servers, turn_servers, rtc_config = parse_rtc_config(config_json)
         else:
             # Use existing coturn-web infrastructure.
@@ -601,10 +618,13 @@ def main():
     cursor_size = int(args.cursor_size)
     hostname = args.hostname
     enable_webcam = args.enable_webcam.lower() == "true"
+    asymmetric_ice_mode = args.asymmetric_ice_mode.lower() == "true"
 
     # Create instance of app
-    app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname)
-    webcam_app = GSTWebRTCApp(stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, curr_video_bitrate, curr_audio_bitrate, hostname, enable_webcam)
+    app = GSTWebRTCApp(asymmetric_ice_mode, stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder,
+            curr_video_bitrate, curr_audio_bitrate, hostname)
+    webcam_app = GSTWebRTCApp(asymmetric_ice_mode, stun_servers, turn_servers, enable_audio, audio_channels, curr_fps, args.encoder, 
+            curr_video_bitrate, curr_audio_bitrate, hostname, enable_webcam)
 
     # [END main_setup]
 
@@ -848,9 +868,10 @@ def main():
 
     # Callback method to update turn servers of a running pipeline.
     def mon_rtc_config(stun_servers, turn_servers, rtc_config):
-        for turn_server in turn_servers:
-            if app.webrtcbin:
-                app.webrtcbin.emit("add-turn-server", turn_server)
+        if not asymmetric_ice_mode:
+            for turn_server in turn_servers:
+                if app.webrtcbin:
+                    app.webrtcbin.emit("add-turn-server", turn_server)
         server.set_rtc_config(rtc_config)
 
     # Initialize periodic montior to refresh TURN RTC config when using shared secret.
@@ -884,7 +905,9 @@ def main():
         args.turn_port, 
         args.turn_username, 
         args.turn_password, 
-        turn_protocol, using_turn_tls)
+        turn_protocol, 
+        using_turn_tls,
+        using_stunner)
     coturn_env_mon.on_rtc_config = mon_rtc_config
 
     async def desktop_pipeline():

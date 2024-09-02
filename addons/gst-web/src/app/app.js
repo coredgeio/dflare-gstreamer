@@ -812,11 +812,17 @@ function runApp() {
       // get initial local resolution
       app.windowResolution = webrtc.input.getWindowResolution();
 
-      if (config.iceServers.length > 1) {
-        app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + config.iceServers[1].urls.join(", ")));
-      } else {
+      var hasTurnServer = false
+      for (const iceServer of config.iceServer) {
+        if (iceServer.urls[0].startsWith("turn")) {
+          hasTurnServer = true;
+          app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + config.iceServers[1].urls.join(", ")));
+        }
+      }
+      if (!hasTurnServer) {
         app.debugEntries.push(applyTimestamp("[app] no TURN servers found."));
       }
+
       webrtc.rtcPeerConfig = config;
       webrtc.connect();
 
