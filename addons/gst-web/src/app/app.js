@@ -813,10 +813,10 @@ function runApp() {
       app.windowResolution = webrtc.input.getWindowResolution();
 
       var hasTurnServer = false
-      for (const iceServer of config.iceServer) {
+      for (const iceServer of config.iceServers) {
         if (iceServer.urls[0].startsWith("turn")) {
           hasTurnServer = true;
-          app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + config.iceServers[1].urls.join(", ")));
+          app.debugEntries.push(applyTimestamp("[app] using TURN servers: " + iceServer.urls.join(", ")));
         }
       }
       if (!hasTurnServer) {
