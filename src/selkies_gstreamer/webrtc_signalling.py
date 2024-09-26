@@ -24,6 +24,7 @@ import json
 import logging
 import websockets
 import asyncio
+import ssl
 
 logger = logging.getLogger("webrtc_signalling")
 logger.setLevel(logging.INFO)
@@ -52,7 +53,7 @@ class WebRTCSignallingErrorNoPeer(Exception):
 
 
 class WebRTCSignalling:
-    def __init__(self, server, id, peer_id, enable_basic_auth=False, basic_auth_user=None, basic_auth_password=None):
+    def __init__(self, server, id, peer_id, enable_https=False, enable_basic_auth=False, basic_auth_user=None, basic_auth_password=None):
         """Initialize the signalling instnance
 
         Arguments:
@@ -64,6 +65,7 @@ class WebRTCSignalling:
         self.server = server
         self.id = id
         self.peer_id = peer_id
+        self.enable_https = enable_https
         self.enable_basic_auth = enable_basic_auth
         self.basic_auth_user = basic_auth_user
         self.basic_auth_password = basic_auth_password
@@ -94,6 +96,11 @@ class WebRTCSignalling:
 
         """
         try:
+            sslctx = None
+            if self.enable_https:
+                sslctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+                sslctx.check_hostname = False
+                sslctx.verify_mode = ssl.CERT_NONE
             headers = None
             if self.enable_basic_auth:
                 auth64 = base64.b64encode(bytes("{}:{}".format(self.basic_auth_user, self.basic_auth_password), "ascii")).decode("ascii")

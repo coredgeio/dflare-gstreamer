@@ -97,32 +97,40 @@ function runApp() {
         status: "connecting",
         loadingText: "",
         clipboardStatus: "enabled",
-        gamepadState: "disconnected",
-        gamepadName: "none",
         windowResolution: "",
-        connectionStatType: "unknown",
-        connectionLatency: 0,
-        connectionVideoLatency: 0,
-        connectionAudioLatency: 0,
-        connectionAudioCodecName: "NA",
-        connectionAudioBitrate: 0,
-        connectionPacketsReceived: 0,
-        connectionPacketsLost: 0,
-        connectionBytesReceived: 0,
-        connectionBytesSent: 0,
-        connectionCodec: "unknown",
-        connectionVideoDecoder: "unknown",
-        connectionResolution: "",
-        connectionFrameRate: 0,
-        connectionVideoBitrate: 0,
-        connectionAvailableBandwidth: 0,
         encoderName: "",
-        serverCPUUsage: 0,
-        gpuLoad: 0,
-        gpuMemoryTotal: 0,
-        gpuMemoryUsed: 0,
-        serverMemoryTotal: 0,
-        serverMemoryUsed: 0,
+        gamepad: {
+          gamepadState: "disconnected",
+          gamepadName: "none",
+        },
+        connectionStat: {
+          connectionStatType: "unknown",
+          connectionLatency: 0,
+          connectionVideoLatency: 0,
+          connectionAudioLatency: 0,
+          connectionAudioCodecName: "NA",
+          connectionAudioBitrate: 0,
+          connectionPacketsReceived: 0,
+          connectionPacketsLost: 0,
+          connectionBytesReceived: 0,
+          connectionBytesSent: 0,
+          connectionCodec: "unknown",
+          connectionVideoDecoder: "unknown",
+          connectionResolution: "",
+          connectionFrameRate: 0,
+          connectionVideoBitrate: 0,
+          connectionAvailableBandwidth: 0,
+        },
+        gpuStat: {
+          gpuLoad: 0,
+          gpuMemoryTotal: 0,
+          gpuMemoryUsed: 0,
+        },
+        cpuStat: {
+          serverCPUUsage: 0,
+          serverMemoryTotal: 0,
+          serverMemoryUsed: 0,
+        },
         serverLatency: 0,
         resizeRemote: true,
         scaleLocal: true,
@@ -195,8 +203,13 @@ function runApp() {
         )[0];
       },
       enterFullscreen() {
-        // Request full screen mode.
-        webrtc.element.parentElement.requestFullscreen();
+        if (webrtc && 'input' in webrtc && 'enterFullscreen' in webrtc.input) {
+          // Fold menu in order to call webrtc.input.attach_context()
+          if (app.showDrawer) {
+              app.showDrawer = !app.showDrawer;
+          }
+          webrtc.input.enterFullscreen();
+      }
       },
       playVideo() {
         setTimeout(() =>{
@@ -365,9 +378,7 @@ function runApp() {
     },
 
     updated: () => {
-      document.title = "Dflare";
-      document.querySelector("link[rel*='icon']").href =
-        "/favicon192.png";
+      document.title = "Remote Desktop";
     },
   });
 
@@ -417,6 +428,17 @@ function runApp() {
     videoElement.style.cursor = "auto";
     webrtc.reset();
   };
+  // ----------------------------//
+  webcam_signalling.onstatus = (message) => {
+    app.loadingText = message;
+    app.logEntries.push(applyTimestamp("[webcam signalling] " + message));
+  };
+  webcam_signalling.onerror = (message) => {
+    app.logEntries.push(applyTimestamp("[webcam signalling] [ERROR] " + message));
+  };
+  webcam_signalling.ondisconnect = () => {
+    console.log("webcam signalling disconnected");
+  }
 
   // Send webrtc status and error messages to logs.
   webrtc.onstatus = (message) => {app.logEntries.push(applyTimestamp("[webrtc] " + message))};
@@ -425,118 +447,126 @@ function runApp() {
   webcam_webrtc.onerror = (message) => { app.logEntries.push(applyTimestamp("[webcam webrtc] [ERROR] " + message)) };
 
   if (app.debug) {
-    signalling.ondebug = (message) => {
-      app.debugEntries.push("[signalling] " + message);
-    };
-    webrtc.ondebug = (message) => {
-      app.debugEntries.push(applyTimestamp("[webrtc] " + message));
-    };
+    signalling.ondebug = (message) => { app.debugEntries.push("[signalling] " + message); };
+    webrtc.ondebug = (message) => { app.debugEntries.push(applyTimestamp("[webrtc] " + message)); };
+    webcam_signalling.ondebug = (message) => { app.debugEntries.push("[webcam signalling] " + message); };
+    webcam_webrtc.ondebug = (message) => { app.debugEntries.push(applyTimestamp("[webcam webrtc] " + message)); };
   }
 
-  webrtc.ongpustats = (data) => {
-    app.gpuLoad = Math.round(data.load * 100);
-    app.gpuMemoryTotal = data.memory_total;
-    app.gpuMemoryUsed = data.memory_used;
-  };
-
-  // Bind vue status to connection state.
-  webrtc.onconnectionstatechange = (state) => {
-    app.status = state;
-
-    if (state === "connected") {
-      // Start watching stats.
-      var videoBytesReceivedStart = 0;
-      var audioBytesReceivedStart = 0;
-      var statsStart = new Date().getTime() / 1000;
-      var statsLoop = () => {
-        webrtc.getConnectionStats().then((stats) => {
-          var now = new Date().getTime() / 1000;
-
-          // Sum of video+audio+server latency in ms.
-          app.connectionLatency = 0;
-          app.connectionLatency += app.serverLatency;
-
-          // Sum of video+audio packets.
-          app.connectionPacketsReceived = 0;
-          app.connectionPacketsLost = 0;
-
-          // Connection stats
-          app.connectionStatType = stats.general.connectionType;
-          app.connectionBytesReceived =
-            (stats.general.bytesReceived * 1e-6).toFixed(2) + " MBytes";
-          app.connectionBytesSent =
-            (stats.general.bytesSent * 1e-6).toFixed(2) + " MBytes";
-          app.connectionAvailableBandwidth =
-            (parseInt(stats.general.availableReceiveBandwidth) / 1e6).toFixed(
-              2
-            ) + " mbps";
-
-          // Video stats.
-          app.connectionVideoLatency = parseInt(
-            stats.video.jitterBufferDelay * 1000
-          );
-          app.connectionLatency += stats.video.jitterBufferDelay * 1000;
-          app.connectionPacketsReceived += stats.video.packetsReceived;
-          app.connectionPacketsLost += stats.video.packetsLost;
-          app.connectionCodec = stats.video.codecName;
-          app.connectionVideoDecoder = stats.video.decoder;
-          app.connectionResolution =
-            stats.video.frameWidth + "x" + stats.video.frameHeight;
-          app.connectionFrameRate = stats.video.framesPerSecond;
-          app.connectionVideoBitrate = (
-            (((stats.video.bytesReceived - videoBytesReceivedStart) /
-              (now - statsStart)) *
-              8) /
-            1e6
-          ).toFixed(2);
-          videoBytesReceivedStart = stats.video.bytesReceived;
-
-          // Audio stats.
-          if (app.audioEnabled) {
-            app.connectionLatency += stats.audio.jitterBufferDelay * 1000;
-            app.connectionPacketsReceived += stats.audio.packetsReceived;
-            app.connectionPacketsLost += stats.audio.packetsLost;
-            app.connectionAudioLatency = parseInt(
-              stats.audio.jitterBufferDelay * 1000
-            );
-            app.connectionAudioCodecName = stats.audio.codecName;
-            app.connectionAudioBitrate = (
-              (((stats.audio.bytesReceived - audioBytesReceivedStart) /
-                (now - statsStart)) *
-                8) /
-              1e3
-            ).toFixed(2);
-            audioBytesReceivedStart = stats.audio.bytesReceived;
-          } else {
-            app.connectionAudioBitrate = 0;
-            app.connectionAudioCodecName = "NA";
-            app.connectionAudioLatency = "NA";
-          }
-
-          // Format latency
-          app.connectionLatency = parseInt(app.connectionLatency);
-
-          statsStart = now;
-
-          // Stats refresh loop.
-          setTimeout(statsLoop, 1000);
-        });
-      };
-      statsLoop();
+  webrtc.ongpustats = async (data) => {
+    // Update DOM only when menu is visible
+    if (app.showDrawer) {
+      app.gpuStat = {gpuLoad: Math.round(data.load * 100), gpuMemoryTotal: data.memory_total, gpuMemoryUsed: data.memory_used}
     }
   };
+
+  var statWatchEnabled = false;
+  var connectionStat = {};
+  // Bind vue status to connection state.
+  function enableStatWatch() {
+    // Start watching stats
+    var videoBytesReceivedStart = 0;
+    var audioBytesReceivedStart = 0;
+    var previousVideoJitterBufferDelay = 0.0;
+    var previousVideoJitterBufferEmittedCount = 0;
+    var previousAudioJitterBufferDelay = 0.0;
+    var previousAudioJitterBufferEmittedCount = 0;
+    var statsStart = new Date().getTime() / 1000;
+    var statsLoop = setInterval(async () => {
+      webrtc.getConnectionStats().then((stats) => {
+      var now = new Date().getTime() / 1000;
+        statWatchEnabled = true;
+
+        var now = new Date().getTime() / 1000;
+
+        connectionStat = {};
+
+        // Connection latency in milliseconds
+        connectionStat.connectionLatency = 0.0;
+        connectionStat.connectionLatency = (stats.general.currentRoundTripTime !== null) ? (stats.general.currentRoundTripTime * 1000.0) : (app.serverLatency);
+
+        // Sum of video+audio packets
+        connectionStat.connectionPacketsReceived = 0;
+        connectionStat.connectionPacketsLost = 0;
+
+        // Connection stats
+        connectionStat.connectionStatType = stats.general.connectionType
+        connectionStat.connectionBytesReceived = (stats.general.bytesReceived  * 1e-6).toFixed(2) + " MBytes";
+        connectionStat.connectionBytesSent = (stats.general.bytesSent * 1e-6).toFixed(2) + " MBytes";
+        connectionStat.connectionAvailableBandwidth = (parseInt(stats.general.availableReceiveBandwidth) / 1e+6).toFixed(2) + " mbps";
+
+        // Video stats
+        connectionStat.connectionPacketsReceived += stats.video.packetsReceived;
+        connectionStat.connectionPacketsLost += stats.video.packetsLost;
+        connectionStat.connectionCodec = stats.video.codecName;
+        connectionStat.connectionVideoDecoder = stats.video.decoder;
+        connectionStat.connectionResolution = stats.video.frameWidth + "x" + stats.video.frameHeight;
+        connectionStat.connectionFrameRate = stats.video.framesPerSecond;
+        connectionStat.connectionVideoBitrate = (((stats.video.bytesReceived - videoBytesReceivedStart) / (now - statsStart)) * 8 / 1e+6).toFixed(2);
+        videoBytesReceivedStart = stats.video.bytesReceived;
+
+        // Audio stats
+        connectionStat.connectionPacketsReceived += stats.audio.packetsReceived;
+        connectionStat.connectionPacketsLost += stats.audio.packetsLost;
+        connectionStat.connectionAudioCodecName = stats.audio.codecName;
+        connectionStat.connectionAudioBitrate = (((stats.audio.bytesReceived - audioBytesReceivedStart) / (now - statsStart)) * 8 / 1e+3).toFixed(2);
+        audioBytesReceivedStart = stats.audio.bytesReceived;
+
+        // Latency stats
+        connectionStat.connectionVideoLatency = parseInt(Math.round(connectionStat.connectionLatency + (1000.0 * (stats.video.jitterBufferDelay - previousVideoJitterBufferDelay) / (stats.video.jitterBufferEmittedCount - previousVideoJitterBufferEmittedCount) || 0)));
+        previousVideoJitterBufferDelay = stats.video.jitterBufferDelay;
+        previousVideoJitterBufferEmittedCount = stats.video.jitterBufferEmittedCount;
+        connectionStat.connectionAudioLatency = parseInt(Math.round(connectionStat.connectionLatency + (1000.0 * (stats.audio.jitterBufferDelay - previousAudioJitterBufferDelay) / (stats.audio.jitterBufferEmittedCount - previousAudioJitterBufferEmittedCount) || 0)));
+        previousAudioJitterBufferDelay = stats.audio.jitterBufferDelay;
+        previousAudioJitterBufferEmittedCount = stats.audio.jitterBufferEmittedCount;
+
+        // Format latency
+        connectionStat.connectionLatency = parseInt(Math.round(connectionStat.connectionLatency));
+
+        statsStart = now; 
+        
+        // Update DOM only when menu is visible
+        if (app.showDrawer) {
+            app.connectionStat = connectionStat;
+        }
+
+        webrtc.sendDataChannelMessage("_stats_video," + JSON.stringify(stats.allReports));
+      });
+    }, 1000)
+  }
+
+  webrtc.onconnectionstatechange = (state) => {
+    if (state === "connected") {
+      // Repeatedly emit minimum latency target
+      webrtc.peerConnection.getReceivers().forEach((receiver) => {
+        let intervalLoop = setInterval(async () => {
+            if (receiver.track.readyState !== "live" || receiver.transport.state !== "connected") {
+                clearInterval(intervalLoop);
+                return;
+            } else {
+                receiver.jitterBufferTarget = receiver.jitterBufferDelayHint = receiver.playoutDelayHint = 0;
+            }
+        }, 15);
+      });
+    }
+
+    app.status = state;
+    if (!statWatchEnabled) {
+      enableStatWatch();
+    }
+  }
 
   webrtc.ondatachannelopen = () => {
     // Bind gamepad connected handler.
     webrtc.input.ongamepadconnected = (gamepad_id) => {
-      app.gamepadState = "connected";
-      app.gamepadName = gamepad_id;
+      webrtc._setStatus('Gamepad connected: ' + gamepad_id);
+      app.gamepad = {gamepadState: "connected", gamepadName: gamepad_id};
     };
 
     // Bind gamepad disconnect handler.
     webrtc.input.ongamepaddisconnected = () => {
-      app.gamepadState = "disconnected";
-      app.gamepadName = "none";
+      webrtc._setStatus('Gamepad disconnected: ' + gamepad_id);
+      app.gamepad = {gamepadState: "disconnected", gamepadName: "none"};
     };
 
     // Bind input handlers.
@@ -549,15 +579,12 @@ function runApp() {
 
     // Send client-side metrics over data channel every 5 seconds
     setInterval(() => {
-      if (app.connectionFrameRate === parseInt(app.connectionFrameRate, 10))
-        webrtc.sendDataChannelMessage("_f," + app.connectionFrameRate);
-      if (app.connectionLatency === parseInt(app.connectionLatency, 10))
-        webrtc.sendDataChannelMessage("_l," + app.connectionLatency);
-
-        webrtc.sendDataChannelMessage("_vbr," + app.connectionVideoBitrate);
-        webrtc.sendDataChannelMessage("_abr," + app.connectionAudioBitrate);
-        webrtc.sendDataChannelMessage("_abw," + app.connectionAvailableBandwidth.split(" ")[0]);
-        webrtc.sendDataChannelMessage("_res," + app.connectionResolution)
+      if (connectionStat.connectionFrameRate === parseInt(connectionStat.connectionFrameRate, 10)) webrtc.sendDataChannelMessage('_f,' + connectionStat.connectionFrameRate);
+      if (connectionStat.connectionLatency === parseInt(connectionStat.connectionLatency, 10)) webrtc.sendDataChannelMessage('_l,' + connectionStat.connectionLatency);
+        webrtc.sendDataChannelMessage("_vbr," + connectionStat.connectionVideoBitrate);
+        webrtc.sendDataChannelMessage("_abr," +  connectionStat.connectionAudioBitrate);
+        webrtc.sendDataChannelMessage("_abw," + connectionStat.connectionAvailableBandwidth.split(" ")[0]);
+        webrtc.sendDataChannelMessage("_res," + connectionStat.connectionResolution)
     }, 5000);
   };
 
@@ -569,19 +596,10 @@ function runApp() {
     app.showDrawer = !app.showDrawer;
   };
 
-  webrtc.input.onfullscreenhotkey = () => {
-    app.enterFullscreen();
-  };
-
   webrtc.input.onresizeend = () => {
     app.windowResolution = webrtc.input.getWindowResolution();
-    var newRes =
-      parseInt(app.windowResolution[0] / window.devicePixelRatio) +
-      "x" +
-      parseInt(app.windowResolution[1] / window.devicePixelRatio);
-    console.log(
-      `Window size changed: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`
-    );
+    var newRes = parseInt(app.windowResolution[0] / window.devicePixelRatio) + "x" + parseInt(app.windowResolution[1] / window.devicePixelRatio);
+    console.log(`Window size changed: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`);
     webrtc.sendDataChannelMessage("r," + newRes);
   };
 
@@ -613,12 +631,13 @@ function runApp() {
   });
 
   webrtc.onclipboardcontent = (content) => {
-    if (app.clipboardStatus === "enabled") {
-      navigator.clipboard.writeText(content).catch((err) => {
-        app._setDebug("Could not copy text to clipboard: " + err);
-      });
+    if (app.clipboardStatus === 'enabled') {
+        navigator.clipboard.writeText(content)
+            .catch(err => {
+                webrtc._setStatus('Could not copy text to clipboard: ' + err);
+        });
     }
-  };
+  }
 
   webrtc.oncursorchange = (handle, curdata, hotspot, override) => {
     if (parseInt(handle) === 0) {
@@ -698,26 +717,24 @@ function runApp() {
       } else {
         // Use server setting.
         app.resizeRemote = action.split(",")[1].toLowerCase() === "true";
-        if (
-          app.resizeRemote === false &&
-          app.getBoolParam("scaleLocal", null) === null
-        ) {
+        if (app.resizeRemote === false && app.getBoolParam("scaleLocal", null) === null) {
           // Enable local scaling if remote resize is disabled and there is no saved value.
           app.scaleLocal = true;
         }
       }
-
-      // Send initial window size.
+    } else if (action.startsWith("resolution")) {
+      // ------------------------------------- //
+      // Sent when remote resizing is enabled.
+      // Match the CSS of the video element to the remote resolution.
+      var remote_res = action.split(",")[1];
+      console.log("received remote resolution of: " + remote_res);
       if (app.resizeRemote === true) {
-        app.windowResolution = webrtc.input.getWindowResolution();
-        var newRes =
-          parseInt(app.windowResolution[0] / window.devicePixelRatio) +
-          "x" +
-          parseInt(app.windowResolution[1] / window.devicePixelRatio);
-        console.log(
-          `Initial window resolution: ${app.windowResolution[0]}x${app.windowResolution[1]}, scaled to: ${newRes}`
-        );
-        webrtc.sendDataChannelMessage("r," + newRes);
+          var toks = remote_res.split("x");
+          webrtc.element.style.width = toks[0]/window.devicePixelRatio+'px';
+          webrtc.element.style.height = toks[1]/window.devicePixelRatio+'px';
+
+          // Update cursor scale factor
+          webrtc.input.getCursorScaleFactor({ remoteResolutionEnabled: true });
       }
     } else if (action.startsWith("local_scaling")) {
       // Local scaling default pushed from server
@@ -732,10 +749,10 @@ function runApp() {
         app.scaleLocal = action.split(",")[1].toLowerCase() === "true";
       }
     } else if (action.startsWith("encoder")) {
-      if (action.split(",")[1].startsWith("x264")) {
-        app.encoderName = "software";
+      if (action.split(",")[1].startsWith("nv") || action.split(",")[1].startsWith("va")) {
+          app.encoderName = "hardware" + " (" + action.split(",")[1] + ")";
       } else {
-        app.encoderName = "hardware";
+          app.encoderName = "software" + " (" + action.split(",")[1] + ")";
       }
     } else if (action.startsWith("hostname")){
         app.workspaceName = action.split(",")[1]
@@ -747,23 +764,25 @@ function runApp() {
   };
 
   webrtc.onlatencymeasurement = (latency_ms) => {
-    app.serverLatency = latency_ms;
+    app.serverLatency = latency_ms * 2.0;
   };
 
-  webrtc.onsystemstats = (stats) => {
-    if (stats.cpu_percent !== undefined)
-      app.serverCPUUsage = stats.cpu_percent.toFixed(0);
-    if (stats.mem_total !== undefined) app.serverMemoryTotal = stats.mem_total;
-    if (stats.mem_used !== undefined) app.serverMemoryUsed = stats.mem_used;
+  webrtc.onsystemstats = async (stats) => {
+    // Update DOM only when menu is visible
+    if (app.showDrawer && (stats.cpu_percent !== undefined || stats.mem_total !== undefined || stats.mem_used !== undefined)) {
+      var cpuStat = {serverCPUUsage: app.cpuStat.serverCPUUsage, serverMemoryTotal: app.cpuStat.serverMemoryTotal, serverMemoryUsed: app.cpuStat.serverMemoryUsed};
+      if (stats.cpu_percent !== undefined) cpuStat.serverCPUUsage = stats.cpu_percent.toFixed(0);
+      if (stats.mem_total !== undefined) cpuStat.serverMemoryTotal = stats.mem_total;
+      if (stats.mem_used !== undefined) cpuStat.serverMemoryUsed = stats.mem_used;
+      app.cpuStat = cpuStat;
+    }
   };
 
   // Safari withou Permission-Api enabled fails here
   if (navigator.permissions) {
-    navigator.permissions
-      .query({
+    navigator.permissions.query({
         name: "clipboard-read",
-      })
-      .then((permissionStatus) => {
+      }).then((permissionStatus) => {
         // Will be 'granted', 'denied' or 'prompt':
         if (permissionStatus.state === "granted") {
           app.clipboardStatus = "enabled";

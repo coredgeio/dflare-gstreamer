@@ -91,7 +91,7 @@ class Input {
         /**
          * @type {function}
          */
-        this.onfullscreenhotkey = null;
+        this.onfullscreenhotkey = this.enterFullscreen;
 
         /**
          * @type {function}
@@ -101,13 +101,14 @@ class Input {
         /**
          * @type {function}
          */
-        this.ongamepaddisconneceted = null;
+        this.ongamepaddisconnected = null;
 
         /**
          * List of attached listeners, record keeping used to detach all.
          * @type {Array}
          */
         this.listeners = [];
+        this.listeners_context = [];
 
         /**
          * @type {function}
@@ -146,13 +147,30 @@ class Input {
         if (event.type === 'mousemove' && !this.m) return;
 
         if (!document.pointerLockElement) {
-            if (this.mouseRelative)
-                event.target.requestPointerLock();
+            if (this.mouseRelative) {
+                event.target.requestPointerLock().then(
+                    () => {
+                        console.log("pointer lock success");
+                    }
+                ).catch(
+                    (e) => {
+                        console.log("pointer lock failed: ", e);
+                    }
+                );
+            }
         }
 
-        // Hotkey to enable pointer lock, CTRL-SHIFT-LeftButton
+        // Hotkey to enable pointer lock, Ctrl-Shift-LeftClick
         if (down && event.button === 0 && event.ctrlKey && event.shiftKey) {
-            event.target.requestPointerLock();
+            event.target.requestPointerLock().then(
+                () => {
+                    console.log("pointer lock success");
+                }
+            ).catch(
+                (e) => {
+                    console.log("pointer lock failed: ", e);
+                }
+            );
             return;
         }
 
@@ -256,7 +274,7 @@ class Input {
                 this._allowThreshold = false;
                 this._smallestDeltaY = 10000;
             } else {
-                // setting this variable to true ensures the shift from mouse pointer back to trackpad
+                // setting this variable to true ensures the shift from mouse pointer back to trackpad/touchpad
                 this._allowThreshold = true;
             }
         }
@@ -265,7 +283,7 @@ class Input {
             this._allowTrackpadScrolling = false;
             this._mouseWheel(event);
 
-            // when threshold is allowed the scroll events being sent to server is limited
+            // when threshold is allowed the scroll events being sent to server are limited
             setTimeout(() => this._allowTrackpadScrolling = true, this._wheelThreshold);
         } else if (!this._allowThreshold) {
             this._mouseWheel(event);
@@ -325,7 +343,7 @@ class Input {
     }
 
     /**
-     * Captures keyboard events to detect pressing of CTRL-SHIFT hotkey.
+     * Captures keyboard events to detect pressing of CTRL-SHIFT hotkeys.
      * @param {KeyboardEvent} event
      */
     _key(event) {
@@ -364,8 +382,11 @@ class Input {
     _pointerLock() {
         if (document.pointerLockElement) {
             this.send("p,1");
+            console.log("remote pointer visibility to: True");
         } else {
             this.send("p,0");
+            console.log("remote pointer visibility to: False");
+
         }
     }
 
@@ -376,6 +397,8 @@ class Input {
         document.exitPointerLock();
         // hide the pointer.
         this.send("p,0");
+        console.log("remote pointer visibility to: False");
+
     }
 
     /**
@@ -499,12 +522,23 @@ class Input {
      */
     _onFullscreenChange() {
         if (document.fullscreenElement !== null) {
-            // Enter fullscreen
+            if (document.pointerLockElement === null) {
+                this.element.requestPointerLock().then(
+                    () => {
+                        console.log("pointer lock success");
+                    }
+                ).catch(
+                    (e) => {
+                        console.log("pointer lock failed: ", e);
+                    }
+                );
+            }
             this.requestKeyboardLock();
-            this.element.requestPointerLock();
         }
         // Reset local keyboard. When holding to exit full-screen the escape key can get stuck.
-        this.keyboard.reset();
+        if (this.keyboard !== null) {
+            this.keyboard.reset();
+        }
 
         // Reset stuck keys on server side.
         this.send("kr");
@@ -540,12 +574,8 @@ class Input {
      */
     attach() {
         this.listeners.push(addListener(this.element, 'resize', this._windowMath, this));
-        this.listeners.push(addListener(this.element, 'wheel', this._mouseWheelWrapper, this));
-        this.listeners.push(addListener(this.element, 'contextmenu', this._contextMenu, this));
-        this.listeners.push(addListener(this.element.parentElement, 'fullscreenchange', this._onFullscreenChange, this));
         this.listeners.push(addListener(document, 'pointerlockchange', this._pointerLock, this));
-        this.listeners.push(addListener(window, 'keydown', this._key, this));
-        this.listeners.push(addListener(window, 'keyup', this._key, this));
+        this.listeners.push(addListener(this.element.parentElement, 'fullscreenchange', this._onFullscreenChange, this));
         this.listeners.push(addListener(window, 'resize', this._windowMath, this));
         this.listeners.push(addListener(window, 'resize', this._resizeStart, this));
 
@@ -553,24 +583,34 @@ class Input {
         this.listeners.push(addListener(window, 'gamepadconnected', this._gamepadConnected, this));
         this.listeners.push(addListener(window, 'gamepaddisconnected', this._gamepadDisconnect, this));
 
-        if ('ontouchstart' in window) {
-            this.listeners.push(addListener(window, 'touchstart', this._touch, this));
-            this.listeners.push(addListener(this.element, 'touchend', this._touch, this));
-            this.listeners.push(addListener(this.element, 'touchmove', this._touch, this));
-
-            console.log("Enabling mouse pointer display for touch devices.");
-            this.send("p,1");
-        } else {
-            this.listeners.push(addListener(this.element, 'mousemove', this._mouseButtonMovement, this));
-            this.listeners.push(addListener(this.element, 'mousedown', this._mouseButtonMovement, this));
-            this.listeners.push(addListener(this.element, 'mouseup', this._mouseButtonMovement, this));
-        }
-
         // Adjust for scroll offset
         this.listeners.push(addListener(window, 'scroll', () => {
             this.m.scrollX = window.scrollX;
             this.m.scrollY = window.scrollY;
         }, this));
+
+        this.attch_context()
+    }
+
+    attch_context() {
+        this.listeners_context.push(addListener(this.element, 'wheel', this._mouseWheelWrapper, this));
+        this.listeners_context.push(addListener(this.element, 'contextmenu', this._contextMenu, this));
+        this.listeners_context.push(addListener(window, 'keydown', this._key, this));
+        this.listeners_context.push(addListener(window, 'keyup', this._key, this));
+
+        if ('ontouchstart' in window) {
+            this.listeners_context.push(addListener(window, 'touchstart', this._touch, this));
+            this.listeners_context.push(addListener(this.element, 'touchend', this._touch, this));
+            this.listeners_context.push(addListener(this.element, 'touchmove', this._touch, this));
+
+            console.log("Enabling mouse pointer display for touch devices.");
+            this.send("p,1");
+            console.log("remote pointer visibility to: True");
+        } else {
+            this.listeners_context.push(addListener(this.element, 'mousemove', this._mouseButtonMovement, this));
+            this.listeners_context.push(addListener(this.element, 'mousedown', this._mouseButtonMovement, this));
+            this.listeners_context.push(addListener(this.element, 'mouseup', this._mouseButtonMovement, this));
+        }
 
         // Using guacamole keyboard because it has the keysym translations.
         this.keyboard = new Guacamole.Keyboard(window);
@@ -584,6 +624,18 @@ class Input {
             this.send("ku," + keysym);
             this.keyRepeatList.remove(keysym);
         };
+
+        if (document.fullscreenElement !== null && document.pointerLockElement === null) {
+            this.element.requestPointerLock().then(
+                () => {
+                    console.log("pointer lock success");
+                }
+            ).catch(
+                (e) => {
+                    console.log("pointer lock failed: ", e);
+                }
+            );
+        }
 
         this._windowMath();
 
@@ -607,7 +659,12 @@ class Input {
 
     detach() {
         removeListeners(this.listeners);
-        this._exitPointerLock();
+        this.detach_context();
+    }
+
+    detach_context() {
+        removeListeners(this.listeners_context);
+
         if (this.keyboard) {
             this.keyboard.onkeydown = null;
             this.keyboard.onkeyup = null;
@@ -619,32 +676,61 @@ class Input {
         // Reset the key-repeat handler
         this.keyRepeatRunning = false;
         this.keyRepeatList.clear();
+
+        this._exitPointerLock();
+    }
+
+    enterFullscreen() {
+        if (document.pointerLockElement === null) {
+            this.element.requestPointerLock().then(
+                () => {
+                    console.log("pointer lock success");
+                }
+            ).catch(
+                (e) => {
+                    console.log("pointer lock failed: ", e);
+                }
+            );
+        }
+        if (document.fullscreenElement === null) {
+            this.element.parentElement.requestFullscreen().then(
+                () => {
+                    console.log("fullscreen success");
+                }
+            ).catch(
+                (e) => {
+                    console.log("fullscreen failed: ", e);
+                }
+            );
+        }
     }
 
     /**
      * Request keyboard lock, must be in fullscreen mode to work.
      */
     requestKeyboardLock() {
-        // event codes: https://www.w3.org/TR/uievents-code/#key-alphanumeric-writing-system
-        const keys = [
-            "AltLeft",
-            "AltRight",
-            "Tab",
-            "Escape",
-            "ContextMenu",
-            "MetaLeft",
-            "MetaRight"
-        ];
-        console.log("requesting keyboard lock");
-        navigator.keyboard.lock(keys).then(
-            () => {
-                console.log("keyboard lock success");
-            }
-        ).catch(
-            (e) => {
-                console.log("keyboard lock failed: ", e);
-            }
-        )
+        if ('keyboard' in navigator && 'lock' in navigator.keyboard) {
+            // event codes: https://www.w3.org/TR/uievents-code/#key-alphanumeric-writing-system
+            const keys = [
+                "AltLeft",
+                "AltRight",
+                "Tab",
+                "Escape",
+                "ContextMenu",
+                "MetaLeft",
+                "MetaRight"
+            ];
+            console.log("requesting keyboard lock");
+            navigator.keyboard.lock(keys).then(
+                () => {
+                    console.log("keyboard lock success");
+                }
+            ).catch(
+                (e) => {
+                    console.log("keyboard lock failed: ", e);
+                }
+            )
+        }
     }
 
     getWindowResolution() {

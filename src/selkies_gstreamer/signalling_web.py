@@ -27,7 +27,7 @@ import concurrent
 import functools
 import json
 
-from hashlib import sha1
+import hashlib
 import hmac
 import base64
 
@@ -47,31 +47,36 @@ MIME_TYPES = {
     "ico": "image/x-icon"
 }
 
-def generate_rtc_config(turn_host, turn_port, shared_secret, user, protocol='udp', turn_tls=False):
-    # use shared secret to generate hmac credential.
+def generate_rtc_config(turn_host, turn_port, shared_secret, user, protocol='udp', turn_tls=False, stun_host=None, stun_port=None):
+    # Use shared secret to generate HMAC credential
 
     # Sanitize user for credential compatibility
     user = user.replace(":", "-")
 
-    # credential expires in 24hrs
-    exp = int(time.time()) + 24*3600
-    username = "{}-{}".format(exp, user)
+    # Credential expires in 24 hours
+    expiry_hour = 24
 
-    # Generate HMAC credential.
-    key = bytes(shared_secret, "ascii")
-    raw = bytes(username, "ascii")
-    hashed = hmac.new(key, raw, sha1)
-    password = base64.b64encode(hashed.digest()).decode()
+    exp = int(time.time()) + expiry_hour * 3600
+    username = "{}:{}".format(exp, user)
+
+    # Generate HMAC credential
+    hashed = hmac.new(bytes(shared_secret, "utf-8"), bytes(username, "utf-8"), hashlib.sha1).digest()
+    password = base64.b64encode(hashed).decode()
+
+    # Configure STUN servers
+    stun_list = ["stun:{}:{}".format(turn_host, turn_port)]
+    if stun_host is not None and stun_port is not None and (stun_host != turn_host or str(stun_port) != str(turn_port)):
+        stun_list.insert(0, "stun:{}:{}".format(stun_host, stun_port))
+    if stun_host != "stun.l.google.com" or (str(stun_port) != "19302"):
+        stun_list.append("stun:stun.l.google.com:19302")
 
     rtc_config = {}
-    rtc_config["lifetimeDuration"] = "{}s".format(24 * 3600)
+    rtc_config["lifetimeDuration"] = "{}s".format(expiry_hour * 3600)
     rtc_config["blockStatus"] = "NOT_BLOCKED"
     rtc_config["iceTransportPolicy"] = "all"
     rtc_config["iceServers"] = []
     rtc_config["iceServers"].append({
-        "urls": [
-            "stun:{}:{}".format(turn_host, turn_port)
-        ]
+        "urls": stun_list
     })
     rtc_config["iceServers"].append({
         "urls": [
@@ -105,20 +110,24 @@ class WebRTCSimpleServer(object):
         # Websocket Server Instance
         self.server = None
 
+         # Signal used to shutdown server
+        self.stop_server = None
+
         # Options
         self.addr = options.addr
         self.port = options.port
         self.keepalive_timeout = options.keepalive_timeout
         self.cert_restart = options.cert_restart
-        self.cert_path = options.cert_path
-        self.disable_ssl = options.disable_ssl
+        self.enable_https = options.enable_https
+        self.https_cert = options.https_cert
+        self.https_key = options.https_key
         self.health_path = options.health
         self.web_root = options.web_root
 
         # Certificate mtime, used to detect when to restart the server
         self.cert_mtime = -1
 
-        self.cache_ttl = 60
+        self.cache_ttl = 300
         self.http_cache = {}
 
         # TURN options
@@ -130,6 +139,8 @@ class WebRTCSimpleServer(object):
             self.turn_protocol = 'udp'
         self.turn_tls = options.turn_tls
         self.turn_auth_header_name = options.turn_auth_header_name
+        self.stun_host = options.stun_host
+        self.stun_port = options.stun_port
 
         # Basic Auth options.
         self.enable_basic_auth = str(options.enable_basic_auth).lower() == 'true'
@@ -143,7 +154,7 @@ class WebRTCSimpleServer(object):
 
         # Perform initial cache of web_root files
         for f in Path(self.web_root).rglob('*.*'):
-            self.cache_file(f)
+            self.cache_file(os.path.realpath(f))
 
         # Validate TURN args
         if self.turn_shared_secret:
@@ -156,7 +167,7 @@ class WebRTCSimpleServer(object):
                 raise Exception("missing basic_auth_password when using enable_basic_auth option.")
             
         # handlers
-        self.on_action = lambda action: logger.warn("Unhandled on_action for dstreamer agent actions")
+        self.on_action = lambda action: logger.warning("Unhandled on_action for dstreamer agent actions")
         # self.list_of_actions = ["shutdown"]
 
     ############### Helper functions ###############
@@ -198,22 +209,22 @@ class WebRTCSimpleServer(object):
                 response_headers.append(('WWW-Authenticate', 'Basic realm="restricted, charset="UTF-8"'))
                 return http.HTTPStatus.UNAUTHORIZED, response_headers, b'Authorization required'
 
-        if path == "/ws" or path.endswith("/signalling/"):
+        if path == "/ws/" or path == "/ws" or path.endswith("/signalling/") or path.endswith("/signalling"):
             return None
 
-        if path == self.health_path:
+        if path == self.health_path + "/" or path == self.health_path:
             return http.HTTPStatus.OK, response_headers, b"OK\n"
 
-        if path == '/turn/':
+        if path == "/turn/" or path == "/turn":
             if self.turn_shared_secret:
                 # Get username from auth header.
                 if not username:
-                    username = request_headers.get(self.turn_auth_header_name, "")
+                    username = request_headers.get(self.turn_auth_header_name, "username")
                     if not username:
                         web_logger.warning("HTTP GET {} 401 Unauthorized - missing auth header: {}".format(path, self.turn_auth_header_name))
                         return HTTPStatus.UNAUTHORIZED, response_headers, b'401 Unauthorized - missing auth header'
                 web_logger.info("Generating HMAC credential for user: {}".format(username))
-                rtc_config = generate_rtc_config(self.turn_host, self.turn_port, self.turn_shared_secret, username, self.turn_protocol, self.turn_tls)
+                rtc_config = generate_rtc_config(self.turn_host, self.turn_port, self.turn_shared_secret, username, self.turn_protocol, self.turn_tls, self.stun_host, self.stun_port)
                 return http.HTTPStatus.OK, response_headers, str.encode(rtc_config)
 
             elif self.rtc_config:
@@ -226,8 +237,8 @@ class WebRTCSimpleServer(object):
                 web_logger.warning("HTTP GET {} 404 NOT FOUND - Missing RTC config".format(path))
                 return HTTPStatus.NOT_FOUND, response_headers, b'404 NOT FOUND'
         
-        logger.info("PATH paths: " + str(path))
-        logger.info("action " + str(path.split("/action/")[1].split("/")[0]))
+        # logger.info("PATH paths: " + str(path))
+        # logger.info("action " + str(path.split("/action/")[1].split("/")[0]))
 
         if path == '/action/shutdown/':
             action = path.split("/action/")[1].split("/")[0]
@@ -437,30 +448,26 @@ class WebRTCSimpleServer(object):
         await ws.send('HELLO')
         return uid
 
-    def get_ssl_certs(self):
-        if 'letsencrypt' in self.cert_path:
-            chain_pem = os.path.join(self.cert_path, 'fullchain.pem')
-            key_pem = os.path.join(self.cert_path, 'privkey.pem')
-        else:
-            chain_pem = os.path.join(self.cert_path, 'cert.pem')
-            key_pem = os.path.join(self.cert_path, 'key.pem')
-        return chain_pem, key_pem
+    def get_https_certs(self):
+        cert_pem = os.path.abspath(self.https_cert) if os.path.isfile(self.https_cert) else None
+        key_pem = os.path.abspath(self.https_key) if os.path.isfile(self.https_key) else None
+        return cert_pem, key_pem
 
-    def get_ssl_ctx(self):
-        if self.disable_ssl:
+    def get_ssl_ctx(self, https_server=True):
+        if not self.enable_https:
             return None
-        # Create an SSL context to be used by the websocket server
-        logger.info('Using TLS with keys in {!r}'.format(self.cert_path))
-        chain_pem, key_pem = self.get_ssl_certs()
-        sslctx = ssl.create_default_context()
-        try:
-            sslctx.load_cert_chain(chain_pem, keyfile=key_pem)
-        except FileNotFoundError:
-            logger.info("Certificates not found, did you run generate_cert.sh?")
-            sys.exit(1)
-        # FIXME
+         # Create an SSL context to be used by the websocket server
+        cert_pem, key_pem = self.get_https_certs()
+        logger.info('Using TLS with provided certificate and private key from arguments')
+        ssl_purpose = ssl.Purpose.CLIENT_AUTH if https_server else ssl.Purpose.SERVER_AUTH
+        sslctx = ssl.create_default_context(purpose=ssl_purpose)
         sslctx.check_hostname = False
         sslctx.verify_mode = ssl.CERT_NONE
+        try:
+            sslctx.load_cert_chain(cert_pem, keyfile=key_pem)
+        except Exception:
+            logger.error('Certificate or private key file not found or incorrect. To use a self-signed certificate, install the package \'ssl-cert\' and add the group \'ssl-cert\' to your user in Debian-based distributions or generate a new certificate with root using \'openssl req -x509 -newkey rsa:4096 -keyout /etc/ssl/private/ssl-cert-snakeoil.key -out /etc/ssl/certs/ssl-cert-snakeoil.pem -days 3650 -nodes -subj \"/CN=localhost\"\'')
+            sys.exit(1)
         return sslctx
 
     async def run(self):
@@ -478,17 +485,14 @@ class WebRTCSimpleServer(object):
             finally:
                 await self.remove_peer(peer_id)
 
-        sslctx = self.get_ssl_ctx()
+        sslctx = self.get_ssl_ctx(https_server=True)
 
         # Setup logging
         logger.setLevel(logging.INFO)
         web_logger.setLevel(logging.WARN)
 
-        if self.disable_ssl:
-            logger.info("Listening on http://{}:{}".format(self.addr, self.port))
-        else:
-            logger.info("Listening on https://{}:{}".format(self.addr, self.port))
-
+        http_protocol = 'https:' if self.enable_https else 'http:'
+        logger.info("Listening on {}//{}:{}".format(http_protocol, self.addr, self.port))
         # Websocket and HTTP server
         http_handler = functools.partial(self.process_request, self.web_root)
         self.stop_server = self.loop.create_future()
@@ -500,7 +504,7 @@ class WebRTCSimpleServer(object):
             await self.stop_server
 
         
-        if not self.disable_ssl:
+        if self.enable_https:
             asyncio.ensure_future(self.check_server_needs_restart(), loop=self.loop)
 
     async def stop(self):
@@ -511,8 +515,8 @@ class WebRTCSimpleServer(object):
         logger.info('Stopped.')
 
     def check_cert_changed(self):
-        chain_pem, key_pem = self.get_ssl_certs()
-        mtime = max(os.stat(key_pem).st_mtime, os.stat(chain_pem).st_mtime)
+        cert_pem, key_pem = self.get_https_certs()
+        mtime = max(os.stat(key_pem).st_mtime, os.stat(cert_pem).st_mtime)
         if self.cert_mtime < 0:
             self.cert_mtime = mtime
             return False
@@ -522,11 +526,11 @@ class WebRTCSimpleServer(object):
         return False
 
     async def check_server_needs_restart(self):
-        "When the certificate changes, we need to restart the server"
-        if not self.cert_restart:
-            return
-        while True:
-            await asyncio.sleep(10)
+        '''
+        When the certificate changes, we need to restart the server
+        '''
+        while self.cert_restart:
+            await asyncio.sleep(1)
             if self.check_cert_changed():
                 logger.info('Certificate changed, stopping server...')
                 await self.stop()
@@ -534,27 +538,32 @@ class WebRTCSimpleServer(object):
 
 
 def main():
+    default_web_root = os.path.join(os.getcwd(), "../../addons/gst-web/src")
+
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # See: host, port in https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.create_server
     parser.add_argument('--addr', default='', help='Address to listen on (default: all interfaces, both ipv4 and ipv6)')
     parser.add_argument('--port', default=8443, type=int, help='Port to listen on')
-    parser.add_argument('--web_root', default=os.getcwd(), type=str, help='Path to web root')
-    parser.add_argument('--rtc_config_file', default="/tmp/rtc.json", type=str, help='Path to json rtc config file')
-    parser.add_argument('--rtc_config', default="", type=str, help='JSON rtc config data')
+    parser.add_argument('--web_root', default=default_web_root, type=str, help='Path to web root')
+    parser.add_argument('--rtc_config_file', default="/tmp/rtc.json", type=str, help='Path to JSON RTC config file')
+    parser.add_argument('--rtc_config', default="", type=str, help='JSON RTC config data')
     parser.add_argument('--turn_shared_secret', default="", type=str, help='shared secret for generating TURN HMAC credentials')
     parser.add_argument('--turn_host', default="", type=str, help='TURN host when generating RTC config with shared secret')
     parser.add_argument('--turn_port', default="", type=str, help='TURN port when generating RTC config with shared secret')
-    parser.add_argument('--turn_protocol', default="udp", type=str, help='TURN protocol to use ("udp" or "tcp"), set to "tcp" without the quotes if "udp" is blocked on the network.')
-    parser.add_argument('--enable_turn_tls', default=False, dest='turn_tls', action='store_true', help='enable TURN over TLS (for the TCP protocol) or TURN over DTLS (for the UDP protocol), valid TURN server certificate required.')
-    parser.add_argument('--turn_auth_header_name', default="x-auth-user", type=str, help='auth header for turn credentials')
-    parser.add_argument('--keepalive-timeout', dest='keepalive_timeout', default=30, type=int, help='Timeout for keepalive (in seconds)')
-    parser.add_argument('--cert-path', default=os.path.dirname(__file__))
-    parser.add_argument('--disable-ssl', default=False, help='Disable ssl', action='store_true')
+    parser.add_argument('--turn_protocol', default="udp", type=str, help='TURN protocol to use ("udp" or "tcp"), set to "tcp" without the quotes if "udp" is blocked on the network')
+    parser.add_argument('--enable_turn_tls', default=False, dest='turn_tls', action='store_true', help='enable TURN over TLS (for the TCP protocol) or TURN over DTLS (for the UDP protocol), valid TURN server certificate required')
+    parser.add_argument('--turn_auth_header_name', default="x-auth-user", type=str, help='auth header for TURN REST username')
+    parser.add_argument('--stun_host', default="stun.l.google.com", type=str, help='STUN host for WebRTC hole punching')
+    parser.add_argument('--stun_port', default="19302", type=str, help='STUN port for WebRTC hole punching')
+    parser.add_argument('--keepalive_timeout', dest='keepalive_timeout', default=30, type=int, help='Timeout for keepalive (in seconds)')
+    parser.add_argument('--enable_https', default=False, help='Enable HTTPS connection', action='store_true')
+    parser.add_argument('--https_cert', default="/etc/ssl/certs/ssl-cert-snakeoil.pem", type=str, help='HTTPS certificate file path')
+    parser.add_argument('--https_key', default="/etc/ssl/private/ssl-cert-snakeoil.key", type=str, help='HTTPS private key file path, set to an empty string if the private key is included in the certificate')
     parser.add_argument('--health', default='/health', help='Health check route')
-    parser.add_argument('--restart-on-cert-change', default=False, dest='cert_restart', action='store_true', help='Automatically restart if the SSL certificate changes')
-    parser.add_argument('--enable_basic_auth', default="false", help="Use basic auth, must also set basic_auth_user, and basic_auth_password args")
-    parser.add_argument('--basic_auth_user', default="", help='Username for basic auth.')
-    parser.add_argument('--basic_auth_password', default="", help='Password for basic auth, if not set, no authorization will be enforced.')
+    parser.add_argument('--restart_on_cert_change', default=False, dest='cert_restart', action='store_true', help='Automatically restart if the HTTPS certificate changes')
+    parser.add_argument('--enable_basic_auth', default=False, dest='enable_basic_auth', action='store_true', help="Use basic authentication, must also set basic_auth_user, and basic_auth_password arguments")
+    parser.add_argument('--basic_auth_user', default="", help='Username for basic authentication')
+    parser.add_argument('--basic_auth_password', default="", help='Password for basic authentication, if not set, no authorization will be enforced')
 
     options = parser.parse_args(sys.argv[1:])
 
