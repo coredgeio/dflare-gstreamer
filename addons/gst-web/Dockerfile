@@ -1,4 +1,4 @@
-FROM node:20.9.0-alpine3.18 as build-stage
+FROM node:20.9.0-alpine3.18 AS build-stage
 
 RUN mkdir /src
 
@@ -31,7 +31,7 @@ COPY --from=build-stage /src/app/manifest.json /src/app/JioCloud_Icon_CMYK.png \
 # COPY install.sh .
 # RUN INSTALL_DIR="/usr/share/nginx/html" ./install.sh 
 
-ENV GST_WEB_PORT 80
-ENV PATH_PREFIX /
+ENV GST_WEB_PORT=80
+ENV PATH_PREFIX=/
 
 CMD ["nginx", "-g", "daemon off;"]

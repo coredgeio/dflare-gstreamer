@@ -19,8 +19,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import Xlib
 from Xlib import display
-from Xlib.ext import xfixes
+from Xlib.ext import xfixes, xtest
 import base64
 import pynput
 import io
@@ -104,40 +105,24 @@ class WebRTCInput:
         # Stores key-repeat keys with arrival time
         self.key_repeat_keys = LinkedList()
 
-        self.on_video_encoder_bit_rate = lambda bitrate: logger.warn(
-            'unhandled on_video_encoder_bit_rate')
-        self.on_audio_encoder_bit_rate = lambda bitrate: logger.warn(
-            'unhandled on_audio_encoder_bit_rate')
-        self.on_mouse_pointer_visible = lambda visible: logger.warn(
-            'unhandled on_mouse_pointer_visible')
-        self.on_clipboard_read = lambda data: logger.warn(
-            'unhandled on_clipboard_read')
-        self.on_set_fps = lambda fps: logger.warn(
-            'unhandled on_set_fps')
-        self.on_set_enable_audio = lambda enable_audio: logger.warn(
-            'unhandled on_set_enable_audio')
-        self.on_set_enable_resize = lambda enable_resize, res: logger.warn(
-            'unhandled on_set_enable_resize')
-        self.on_client_fps = lambda fps: logger.warn(
-            'unhandled on_client_fps')
-        self.on_client_latency = lambda latency: logger.warn(
-            'unhandled on_client_latency')
-        self.on_resize = lambda res: logger.warn(
-            'unhandled on_resize')
-        self.on_ping_response = lambda latency: logger.warn(
-            'unhandled on_ping_response')
-        self.on_cursor_change = lambda msg: logger.warn(
-            'unhandled on_cursor_change')
-        self.on_client_video_bitrate = lambda bitrate: logger.warn(
-            'unhandled on_client_video_bitrate')
-        self.on_client_audio_bitrate = lambda bitrate: logger.warn(
-            'unhandled on_client_audio_bitrate')
-        self.on_client_available_bandwidth = lambda bandwidth: logger.warn(
-            'unhandled on_client_available_bandwidth')
-        self.on_client_resolution = lambda resolution: logger.warn(
-            'unhandled on_client_resolution')
-        self.on_set_enable_webcam = lambda enabled: logger.warn(
-            'unhandled on_set_enable_webcam')
+        self.on_video_encoder_bit_rate = lambda bitrate: logger.warn('unhandled on_video_encoder_bit_rate')
+        self.on_audio_encoder_bit_rate = lambda bitrate: logger.warn('unhandled on_audio_encoder_bit_rate')
+        self.on_mouse_pointer_visible = lambda visible: logger.warn('unhandled on_mouse_pointer_visible')
+        self.on_clipboard_read = lambda data: logger.warn('unhandled on_clipboard_read')
+        self.on_set_fps = lambda fps: logger.warn('unhandled on_set_fps')
+        self.on_set_enable_audio = lambda enable_audio: logger.warn('unhandled on_set_enable_audio')
+        self.on_set_enable_resize = lambda enable_resize, res: logger.warn('unhandled on_set_enable_resize')
+        self.on_client_fps = lambda fps: logger.warn('unhandled on_client_fps')
+        self.on_client_latency = lambda latency: logger.warn('unhandled on_client_latency')
+        self.on_resize = lambda res: logger.warn('unhandled on_resize')
+        self.on_ping_response = lambda latency: logger.warn('unhandled on_ping_response')
+        self.on_cursor_change = lambda msg: logger.warn('unhandled on_cursor_change')
+        self.on_client_video_bitrate = lambda bitrate: logger.warn('unhandled on_client_video_bitrate')
+        self.on_client_audio_bitrate = lambda bitrate: logger.warn('unhandled on_client_audio_bitrate')
+        self.on_client_available_bandwidth = lambda bandwidth: logger.warn('unhandled on_client_available_bandwidth')
+        self.on_client_resolution = lambda resolution: logger.warn('unhandled on_client_resolution')
+        self.on_set_enable_webcam = lambda enabled: logger.warn('unhandled on_set_enable_webcam')
+        self.on_client_webrtc_stats = lambda webrtc_stat_type, webrtc_stats: logger.warn('unhandled on_client_webrtc_stats')
 
     def __keyboard_connect(self):
         self.keyboard = pynput.keyboard.Controller()
@@ -177,7 +162,6 @@ class WebRTCInput:
         self.__mouse_connect()
 
     def disconnect(self):
-        self.__js_disconnect()
         self.__mouse_disconnect()
 
     def reset_keyboard(self):
@@ -223,13 +207,17 @@ class WebRTCInput:
                 self.__mouse_emit(UINPUT_REL_X, x, syn=False)
                 self.__mouse_emit(UINPUT_REL_Y, y)
             else:
-                self.mouse.move(x, y)
+                 # NOTE: the pynput mouse.move method moves the mouse relative to the current position using its internal tracked position.
+                #       this does not work for relative motion where the input should just be a delta value.
+                #       instead, send the X fake input directly.
+                xtest.fake_input(self.xdisplay, Xlib.X.MotionNotify, detail=True, root=Xlib.X.NONE, x=x, y=y)
+                self.xdisplay.sync()
         elif action == MOUSE_SCROLL_UP:
             # Scroll up
             if self.uinput_mouse_socket_path:
                 self.__mouse_emit(UINPUT_REL_WHEEL, 1)
             else:
-                self.mouse.scroll(0, -1)
+                 self.mouse.scroll(0, -1)
         elif action == MOUSE_SCROLL_DOWN:
             # Scroll down
             if self.uinput_mouse_socket_path:
@@ -332,6 +320,7 @@ class WebRTCInput:
         Arguments:
             x {integer} -- mouse position X
             y {integer} -- mouse position Y
+            scroll_magnitude {integer} -- interger with value ranging from 0 to 10
             button_mask {integer} -- mask of 5 mouse buttons, button 1 is at the LSB.
         """
 
@@ -384,6 +373,7 @@ class WebRTCInput:
         if not relative:
             self.xdisplay.sync()
 
+    # TODO: Need to replace xclip with xsel?
     def read_clipboard(self):
         return subprocess.getoutput("xclip -out")
 
@@ -419,10 +409,7 @@ class WebRTCInput:
                 return
 
         xfixes_version = self.xdisplay.xfixes_query_version()
-        logger.info('Found XFIXES version %s.%s' % (
-            xfixes_version.major_version,
-            xfixes_version.minor_version,
-        ))
+        logger.info('Found XFIXES version %s.%s' % (xfixes_version.major_version, xfixes_version.minor_version))
 
         logger.info("starting cursor monitor")
         self.cursor_cache = {}
@@ -440,6 +427,9 @@ class WebRTCInput:
             logger.warning("exception from fetching cursor image: %s" % e)
 
         while self.cursors_running:
+            if self.xdisplay.pending_events() == 0:
+                time.sleep(0.1)
+                continue
             event = self.xdisplay.next_event()
             if (event.type, 0) == self.xdisplay.extension_event.DisplayCursorNotify:
                 cache_key = event.cursor_serial
@@ -467,6 +457,7 @@ class WebRTCInput:
         logger.info("stopping cursor monitor")
         self.cursors_running = False
 
+    # TODO: As we don't have the scaling part(DPI), cursor scaling is needed?
     def cursor_to_msg(self, cursor, target_width, target_height):
         png_data_b64 = base64.b64encode(self.cursor_to_png(cursor, target_width, target_height))
         xhot_scaled = int(target_width/cursor.width * cursor.xhot)
@@ -558,7 +549,10 @@ class WebRTCInput:
             except:
                 x, y, button_mask, scroll_magnitude = 0, 0, self.button_mask, 0
                 relative = False
-            self.send_x11_mouse(x, y, button_mask, scroll_magnitude, relative)
+            try:
+                self.send_x11_mouse(x, y, button_mask, scroll_magnitude, relative)
+            except Exception as e:
+                logger.warning('failed to set mouse cursor: {}'.format(e))
         elif toks[0] == "p":
             # toggle mouse pointer visibility
             visible = bool(int(toks[1]))
@@ -596,11 +590,12 @@ class WebRTCInput:
         elif toks[0] == "r":
             # resize event
             res = toks[1]
-            if not re.match(re.compile(r'^\d+x\d+$'), res):
+            if re.match(re.compile(r'^\d+x\d+$'), res):
+                # Make sure resolution is divisible by 2
+                w, h = [int(i) + int(i) % 2 for i in res.split("x")]
+                self.on_resize("%dx%d" % (w, h))
+            else:
                 logger.warning("rejecting resolution change, invalid WxH resolution: %s" % res)
-            # Make sure resolution is divisible by 2
-            w, h = [int(i) + int(i)%2 for i in res.split("x")]
-            self.on_resize("%dx%d" % (w, h))
         elif toks[0] == "_arg_fps":
             # Set framerate
             fps = int(toks[1])
@@ -684,5 +679,11 @@ class WebRTCInput:
                 logger.info("Timezone is set")
             else:
                 logger.info("Failed to set the timezone")
+        elif toks[0] == "_stats_video" or toks[0] == "_stats_audio":
+            # WebRTC Statistics API data from client
+            try:
+                self.on_client_webrtc_stats(toks[0], ",".join(toks[1:]))
+            except:
+                logger.error("failed to parse WebRTC Statistics JSON object")
         else:
             logger.info('unknown data channel message: %s' % msg)

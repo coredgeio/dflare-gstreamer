@@ -13,7 +13,7 @@ module.exports = {
   entry: {
     bundle: [
       path.resolve(__dirname, './app/app.js'),
-      path.resolve(__dirname, './app/lib/webrtc-adapter-v7.7.1.js'),
+      path.resolve(__dirname, './app/lib/webrtc-adapter-9.0.1.min.js'),
       path.resolve(__dirname, './app/lib/guacamole-keyboard-selkies.js'),
       path.resolve(__dirname, './app/gamepad.js'),
       path.resolve(__dirname, './app/input.js'),
