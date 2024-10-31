@@ -572,10 +572,13 @@ function runApp() {
     // Bind input handlers.
     webrtc.input.attach();
 
-     // get the user timezone to
-     var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone 
-     webrtc.sendDataChannelMessage("tz," + timezone)
-     console.log("Timezone from browser: ", timezone)
+    // get the user timezone to
+    var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone 
+    webrtc.sendDataChannelMessage("tz," + timezone)
+    console.log("Timezone from browser: ", timezone)
+
+    // send initial resolution
+    webrtc.input.onresizeend();
 
     // Send client-side metrics over data channel every 5 seconds
     setInterval(() => {
