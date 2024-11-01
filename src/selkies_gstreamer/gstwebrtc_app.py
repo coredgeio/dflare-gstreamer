@@ -1015,6 +1015,9 @@ class GSTWebRTCApp:
         # Create element for receiving audio from pulseaudio.
         pulsesrc = Gst.ElementFactory.make("pulsesrc", "pulsesrc")
 
+        # specify the speaker device to get audio output from
+        pulsesrc.set_property("device", "output.monitor")
+
         # Let the audio source provide the global clock.
         # This is important when trying to keep the audio and video
         # jitter buffers in sync. If there is skew between the video and audio
@@ -1027,8 +1030,8 @@ class GSTWebRTCApp:
         pulsesrc.set_property("do-timestamp", False)
 
         # Maximum and minimum amount of data to read in each iteration in microseconds
-        pulsesrc.set_property("buffer-time", 20000)
-        pulsesrc.set_property("latency-time", 500)
+        pulsesrc.set_property("buffer-time", 100000)
+        pulsesrc.set_property("latency-time", 1000)
 
         # Create capabilities for pulsesrc and set channels
         pulsesrc_caps = Gst.caps_from_string("audio/x-raw")
@@ -1046,7 +1049,6 @@ class GSTWebRTCApp:
         opusenc.set_property("audio-type", "restricted-lowdelay")
         opusenc.set_property("bandwidth", "fullband")
         opusenc.set_property("bitrate-type", "cbr")
-        opusenc.set_property("dtx", True)
         # OPUS_FRAME: Modify all locations with "OPUS_FRAME:"
         # Browser-side SDP munging ("minptime=3"/"minptime=5") is required if frame-size < 10
         opusenc.set_property("frame-size", "10")
@@ -1064,7 +1066,6 @@ class GSTWebRTCApp:
         # RTP packets that are sent over the connection transport.
         rtpopuspay = Gst.ElementFactory.make("rtpopuspay")
         rtpopuspay.set_property("mtu", 1200)
-        rtpopuspay.set_property("dtx", True)
 
         # Add WebRTC RTP extensions
         extensions_return = self.rtp_add_extensions(rtpopuspay, audio=True)
@@ -1072,23 +1073,23 @@ class GSTWebRTCApp:
             logger.warning("WebRTC RTP extension configuration failed with audio, this may lead to suboptimal performance")
 
         # Insert a queue for the RTP packets.
-        # rtpopuspay_queue = Gst.ElementFactory.make("queue", "rtpopuspay_queue")
+        rtpopuspay_queue = Gst.ElementFactory.make("queue", "rtpopuspay_queue")
 
         # Make the queue leaky in the downstream direction, drop packets if the queue is behind.
-        # rtpopuspay_queue.set_property("leaky", "downstream")
+        rtpopuspay_queue.set_property("leaky", "downstream")
 
         # Discard all data in the queue when an EOS event is received
-        # rtpopuspay_queue.set_property("flush-on-eos", True)
+        rtpopuspay_queue.set_property("flush-on-eos", True)
 
         # Set the queue max time to 16ms (16000000ns)
         # If the pipeline is behind by more than 1s, the packets
         # will be dropped.
         # This helps buffer out latency in the audio source.
-        # rtpopuspay_queue.set_property("max-size-time", 16000000)
+        rtpopuspay_queue.set_property("max-size-time", 16000000)
 
         # Set the other queue sizes to 0 to make it only time-based.
-        # rtpopuspay_queue.set_property("max-size-buffers", 0)
-        # rtpopuspay_queue.set_property("max-size-bytes", 0)
+        rtpopuspay_queue.set_property("max-size-buffers", 0)
+        rtpopuspay_queue.set_property("max-size-bytes", 0)
 
         # Set the capabilities for the rtpopuspay element.
         rtpopuspay_caps = Gst.caps_from_string("application/x-rtp")
@@ -1111,7 +1112,7 @@ class GSTWebRTCApp:
         rtpopuspay_capsfilter.set_property("caps", rtpopuspay_caps)
 
         # Add all elements to the pipeline.
-        pipeline_elements = [pulsesrc, pulsesrc_capsfilter, opusenc, rtpopuspay, rtpopuspay_capsfilter]  # rtpopuspay_queue
+        pipeline_elements = [pulsesrc, pulsesrc_capsfilter, opusenc, rtpopuspay, rtpopuspay_queue, rtpopuspay_capsfilter] 
 
         for pipeline_element in pipeline_elements:
             self.pipeline.add(pipeline_element)
