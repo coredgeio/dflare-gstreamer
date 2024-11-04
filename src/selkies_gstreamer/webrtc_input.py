@@ -217,7 +217,7 @@ class WebRTCInput:
             if self.uinput_mouse_socket_path:
                 self.__mouse_emit(UINPUT_REL_WHEEL, 1)
             else:
-                 self.mouse.scroll(0, -1)
+                self.mouse.scroll(0, -1)
         elif action == MOUSE_SCROLL_DOWN:
             # Scroll down
             if self.uinput_mouse_socket_path:
